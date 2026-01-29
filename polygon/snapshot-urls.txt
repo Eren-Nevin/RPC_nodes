@@ -1,0 +1,114 @@
+# Polygon PoS Mainnet Snapshot URLs
+# Updated: 2026-01-28
+#
+# ==============================================================================
+# IMPORTANT NOTES
+# ==============================================================================
+#
+# Polygon PoS requires TWO components:
+#   1. Heimdall - Consensus layer (~1 TB)
+#   2. Bor - Execution layer (~4.7 TB for Pebble)
+#
+# Archive snapshots are NO LONGER supported due to unsustainable data growth.
+# Only pruned/full node snapshots are available.
+#
+# Total storage needed: ~6-8 TB recommended
+#
+# ==============================================================================
+# OPTION 1: STAKECRAFT (Recommended - via rclone)
+# ==============================================================================
+
+# Rclone Configuration - save to ~/.config/rclone/rclone.conf
+# [r2]
+# type = s3
+# provider = Cloudflare
+# access_key_id = 849df1cd0e8666858df4b1e182a4b2cd
+# secret_access_key = 568a53f5d4ca2b3d38780cd3e7a11ce2d6fe2887fbbe04405a96fc77021e917c
+# acl = private
+# region = auto
+# endpoint = https://dd74dc687a5ce54107082a6849814c19.r2.cloudflarestorage.com
+
+# Bor Pebble Mainnet (Latest)
+# Height: 82,152,610 | Size: 4.7 TB | Version: 2.5.7
+# Path: r2:sc-snapshots/bor-pebble-mainnet_2026-01-26.tar
+
+# Heimdall Mainnet (Latest)
+# Height: 37,846,839 | Size: 1.0 TB | Version: 0.6.0
+# Path: r2:sc-snapshots/heimdall-mainnet_2026-01-28.tar.gz
+
+# ==============================================================================
+# DOWNLOAD COMMANDS (StakeCraft via rclone)
+# ==============================================================================
+
+# 1. Install rclone if not installed:
+#    sudo apt install rclone
+
+# 2. Configure rclone (copy the [r2] config above to ~/.config/rclone/rclone.conf)
+
+# 3. Download Heimdall (~1 TB):
+#    mkdir -p /mnt/viper/polygon-data/heimdall
+#    rclone copy r2:sc-snapshots/heimdall-mainnet_2026-01-28.tar.gz /mnt/viper/polygon-data/ --progress
+#    tar -xzf /mnt/viper/polygon-data/heimdall-mainnet_2026-01-28.tar.gz -C /mnt/viper/polygon-data/heimdall
+
+# 4. Download Bor (~4.7 TB):
+#    mkdir -p /mnt/viper/polygon-data/bor/chaindata
+#    rclone copy r2:sc-snapshots/bor-pebble-mainnet_2026-01-26.tar /mnt/viper/polygon-data/ --progress
+#    tar -xf /mnt/viper/polygon-data/bor-pebble-mainnet_2026-01-26.tar -C /mnt/viper/polygon-data/bor/chaindata
+
+# Stream and extract (saves disk space):
+#    rclone cat "r2:sc-snapshots/heimdall-mainnet_2026-01-28.tar.gz" | pv | tar -xzf - -C /mnt/viper/polygon-data/heimdall
+#    rclone cat "r2:sc-snapshots/bor-pebble-mainnet_2026-01-26.tar" | pv | tar -xf - -C /mnt/viper/polygon-data/bor/chaindata
+
+# ==============================================================================
+# OPTION 2: PUBLICNODE
+# ==============================================================================
+
+# Visit: https://publicnode.com/snapshots
+# - Heimdall v0.6.0 Archive snapshot
+# - Heimdall v1.0.7 Archive snapshot
+# - Bor v2.5.7 Standard snapshot (updated every 24h)
+# - Erigon v2.60.10 Archive snapshot (updated every 7d)
+
+# ==============================================================================
+# OPTION 3: COMMUNITY SNAPSHOTS (all4nodes.io)
+# ==============================================================================
+
+# Visit: https://all4nodes.io/Polygon
+# Aggregates snapshots from multiple community providers
+
+# ==============================================================================
+# FISH SHELL - RCLONE SETUP & DOWNLOAD
+# ==============================================================================
+
+# Create rclone config:
+# mkdir -p ~/.config/rclone
+# cat > ~/.config/rclone/rclone.conf << 'EOF'
+# [r2]
+# type = s3
+# provider = Cloudflare
+# access_key_id = 849df1cd0e8666858df4b1e182a4b2cd
+# secret_access_key = 568a53f5d4ca2b3d38780cd3e7a11ce2d6fe2887fbbe04405a96fc77021e917c
+# acl = private
+# region = auto
+# endpoint = https://dd74dc687a5ce54107082a6849814c19.r2.cloudflarestorage.com
+# EOF
+
+# Download commands for fish:
+#   rclone copy r2:sc-snapshots/heimdall-mainnet_2026-01-28.tar.gz /mnt/viper/polygon-data/ --progress
+#   rclone copy r2:sc-snapshots/bor-pebble-mainnet_2026-01-26.tar /mnt/viper/polygon-data/ --progress
+
+# ==============================================================================
+# STORAGE REQUIREMENTS
+# ==============================================================================
+#
+# Heimdall:     ~1.0 TB (compressed ~300 GB)
+# Bor Pebble:   ~4.7 TB (compressed ~3 TB)
+# Total:        ~6 TB minimum, 8 TB recommended
+#
+# ==============================================================================
+# SOURCES
+# ==============================================================================
+# https://docs.polygon.technology/pos/how-to/snapshots/
+# https://services.stakecraft.com/docs/snapshots/polygon-snapshot
+# https://publicnode.com/snapshots
+# https://all4nodes.io/Polygon

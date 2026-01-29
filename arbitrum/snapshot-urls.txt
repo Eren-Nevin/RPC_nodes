@@ -1,0 +1,4 @@
+https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0000
+https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0001
+https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0002
+https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0003

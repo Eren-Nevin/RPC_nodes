@@ -1,0 +1,115 @@
+# Ethereum L1 Mainnet Snapshot URLs
+# Updated: 2026-01-28
+#
+# ==============================================================================
+# IMPORTANT: FULL NODE vs ARCHIVE NODE
+# ==============================================================================
+#
+# For querying BLOCKS, TRANSACTIONS, RECEIPTS, LOGS:
+#   -> Full Node is SUFFICIENT (all historical data preserved)
+#   -> "Pruning" only affects STATE, not blockchain data
+#
+# For querying HISTORICAL STATE (balance/storage at old blocks):
+#   -> Archive Node is REQUIRED
+#
+# | Data Type          | Full Node      | Archive Node   |
+# |--------------------|----------------|----------------|
+# | Blocks (headers)   | ALL historical | ALL historical |
+# | Transactions       | ALL historical | ALL historical |
+# | Receipts           | ALL historical | ALL historical |
+# | Logs               | ALL historical | ALL historical |
+# | Historical State   | Last ~128 only | ALL historical |
+#
+# ==============================================================================
+# OPTION 1: GETH FULL NODE (~1-1.5 TB) - For blocks/txs/logs queries
+# ==============================================================================
+
+# ethPandaOps Geth Snapshot (FREE, ~895 GB compressed)
+# Contains: All blocks, transactions, receipts, logs from genesis
+# Does NOT contain: Historical state beyond ~128 blocks
+# Format: tar.zst
+https://snapshots.ethpandaops.io/mainnet/geth/24329506/snapshot.tar.zst
+
+# Get LATEST snapshot URL:
+#   BLOCK=$(curl -s https://snapshots.ethpandaops.io/mainnet/geth/latest)
+#   echo "https://snapshots.ethpandaops.io/mainnet/geth/${BLOCK}/snapshot.tar.zst"
+
+# ==============================================================================
+# OPTION 2: ERIGON ARCHIVE NODE (~1.6 TB) - For ALL queries including state
+# ==============================================================================
+
+# Erigon is much more storage-efficient for archive nodes
+# Geth Archive: ~18+ TB vs Erigon Archive: ~1.6 TB
+#
+# Erigon downloads snapshots via BitTorrent automatically when started.
+# No manual download needed - just start Erigon and it will sync.
+#
+# To run Erigon with automatic snapshot download:
+#   docker run -d --name erigon \
+#     -v /mnt/viper/erigon-data:/home/erigon/.local/share/erigon \
+#     -p 8545:8545 \
+#     thorax/erigon:latest \
+#     --chain=mainnet --snapshots=true
+
+# ==============================================================================
+# OPTION 3: RETH FULL NODE (~950 GB compressed)
+# ==============================================================================
+
+# PublicNode Reth Snapshots
+# Visit: https://publicnode.com/snapshots
+# - Reth v1.10.0 (~950 GB) updated every 24 hours
+
+# Merkle.io Reth Snapshots (~1.34 TB compressed, ~2.4 TB decompressed)
+# Visit: https://www.merkle.io/snapshots
+# - Updated every Monday and Thursday
+
+# ==============================================================================
+# DOWNLOAD COMMANDS FOR GETH
+# ==============================================================================
+
+# Using aria2c (fastest, parallel download):
+#   BLOCK=$(curl -s https://snapshots.ethpandaops.io/mainnet/geth/latest)
+#   aria2c -x 16 -s 16 -d /mnt/viper/eth-data \
+#     "https://snapshots.ethpandaops.io/mainnet/geth/${BLOCK}/snapshot.tar.zst"
+
+# Using wget with resume:
+#   BLOCK=$(curl -s https://snapshots.ethpandaops.io/mainnet/geth/latest)
+#   wget --continue -O /mnt/viper/eth-data/geth-snapshot.tar.zst \
+#     "https://snapshots.ethpandaops.io/mainnet/geth/${BLOCK}/snapshot.tar.zst"
+
+# Extract:
+#   tar -I zstd -xvf geth-snapshot.tar.zst -C /mnt/viper/eth-data/geth
+
+# ==============================================================================
+# CONSENSUS LAYER (Required for Ethereum post-merge)
+# ==============================================================================
+
+# Consensus clients use checkpoint sync (fast, no snapshot needed).
+# Use --checkpoint-sync-url flag with one of these endpoints:
+#
+# https://mainnet-checkpoint-sync.attestant.io
+# https://beaconstate.ethstaker.cc
+# https://sync-mainnet.beaconcha.in
+# https://mainnet.checkpoint.sigp.io
+
+# ==============================================================================
+# STORAGE REQUIREMENTS
+# ==============================================================================
+#
+# Geth Full Node:     ~1.5 TB (blocks + recent state)
+# Geth Archive Node:  ~18+ TB (blocks + ALL state)
+# Erigon Archive:     ~1.6 TB (blocks + ALL state, much more efficient)
+# Reth Full Node:     ~2.4 TB
+# Consensus Layer:    ~200-400 GB
+#
+# RECOMMENDED: Erigon if you need historical state queries
+#              Geth if you only need blocks/txs/logs
+
+# ==============================================================================
+# SOURCES
+# ==============================================================================
+# https://ethpandaops.io/data/snapshots/
+# https://publicnode.com/snapshots
+# https://www.merkle.io/snapshots
+# https://github.com/erigontech/erigon-snapshot
+# https://ethereum.org/developers/docs/nodes-and-clients/archive-nodes
