@@ -1,11 +1,11 @@
 services:
-  # Execution Layer (Geth)
-  geth:
-    image: ethereum/client-go:v1.16.8
-    container_name: eth-geth
+  # Execution Layer (Reth)
+  reth:
+    image: ghcr.io/paradigmxyz/reth:v1.10.0
+    container_name: eth-reth
     restart: unless-stopped
     volumes:
-      - /mnt/viper/eth-data/geth:/root/.ethereum
+      - /data/rpc_nodes/eth-data/reth:/root/.local/share/reth/mainnet
       - ./jwt.hex:/jwt.hex:ro
     ports:
       - "8555:8545"    # HTTP RPC
@@ -13,12 +13,13 @@ services:
       - "30303:30303"  # P2P TCP
       - "30303:30303/udp"  # P2P UDP
     command:
-      - --mainnet
+      - node
+      - --chain=mainnet
+      - --full
       - --http
       - --http.addr=0.0.0.0
       - --http.port=8545
       - --http.api=eth,net,web3,txpool
-      - --http.vhosts=*
       - --http.corsdomain=*
       - --ws
       - --ws.addr=0.0.0.0
@@ -27,10 +28,7 @@ services:
       - --ws.origins=*
       - --authrpc.addr=0.0.0.0
       - --authrpc.port=8551
-      - --authrpc.vhosts=*
       - --authrpc.jwtsecret=/jwt.hex
-      - --syncmode=snap
-      - --cache=4096
 
   # Consensus Layer (Lighthouse)
   lighthouse:
@@ -38,9 +36,9 @@ services:
     container_name: eth-lighthouse
     restart: unless-stopped
     depends_on:
-      - geth
+      - reth
     volumes:
-      - /mnt/viper/eth-data/lighthouse:/root/.lighthouse
+      - /data/rpc_nodes/eth-data/lighthouse:/root/.lighthouse
       - ./jwt.hex:/jwt.hex:ro
     ports:
       - "9100:9000"      # P2P TCP
@@ -50,7 +48,7 @@ services:
       - lighthouse
       - bn
       - --network=mainnet
-      - --execution-endpoint=http://geth:8551
+      - --execution-endpoint=http://reth:8551
       - --execution-jwt=/jwt.hex
       - --checkpoint-sync-url=https://beaconstate.ethstaker.cc
       - --http

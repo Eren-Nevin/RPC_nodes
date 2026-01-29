@@ -1,11 +1,10 @@
 #!/bin/bash
 # Wait for extraction to complete and start Ethereum node
 
-EXTRACT_LOG="/tmp/eth-extract.log"
-DATA_DIR="/mnt/viper/eth-data/geth"
+DATA_DIR="/data/rpc_nodes/eth-data/reth"
 
 echo "Monitoring extraction progress..."
-echo "Compressed: ~895 GB → Extracted: ~1.5 TB"
+echo "Compressed: ~961 GB → Extracted: ~2.4 TB"
 echo ""
 
 while pgrep -f "tar.*zstd.*snapshot.tar.zst" > /dev/null; do
@@ -21,13 +20,13 @@ echo ""
 
 # Fix ownership for container
 echo "Setting ownership to 1000:1000..."
-sudo chown -R 1000:1000 /mnt/viper/eth-data/
+sudo chown -R 1000:1000 /data/rpc_nodes/eth-data/
 
 echo "Starting Ethereum node..."
-cd /home/mvp/Running/RPC/eth
+cd /home/mvp/Running/RPC_nodes/eth
 docker compose up -d
 
 echo ""
 echo "Node started! Check logs with:"
-echo "  docker logs -f eth-geth"
+echo "  docker logs -f eth-reth"
 echo "  docker logs -f eth-lighthouse"

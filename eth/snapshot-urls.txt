@@ -1,5 +1,6 @@
 # Ethereum L1 Mainnet Snapshot URLs
-# Updated: 2026-01-28
+# Updated: 2026-01-29
+# Client: Reth (archive mode with --full flag)
 #
 # ==============================================================================
 # IMPORTANT: FULL NODE vs ARCHIVE NODE
@@ -21,64 +22,58 @@
 # | Historical State   | Last ~128 only | ALL historical |
 #
 # ==============================================================================
-# OPTION 1: GETH FULL NODE (~1-1.5 TB) - For blocks/txs/logs queries
+# OPTION 1 (ACTIVE): RETH ARCHIVE NODE - ethPandaOps (~961 GB compressed)
 # ==============================================================================
 
-# ethPandaOps Geth Snapshot (FREE, ~895 GB compressed)
-# Contains: All blocks, transactions, receipts, logs from genesis
-# Does NOT contain: Historical state beyond ~128 blocks
+# ethPandaOps Reth Snapshot (FREE, ~961 GB compressed)
+# Contains: All blocks, transactions, receipts, logs, state from genesis
 # Format: tar.zst
-https://snapshots.ethpandaops.io/mainnet/geth/24329506/snapshot.tar.zst
+# Updated regularly
+https://snapshots.ethpandaops.io/mainnet/reth/24329506/snapshot.tar.zst
 
 # Get LATEST snapshot URL:
-#   BLOCK=$(curl -s https://snapshots.ethpandaops.io/mainnet/geth/latest)
-#   echo "https://snapshots.ethpandaops.io/mainnet/geth/${BLOCK}/snapshot.tar.zst"
+#   set BLOCK (curl -s https://snapshots.ethpandaops.io/mainnet/reth/latest)
+#   echo "https://snapshots.ethpandaops.io/mainnet/reth/$BLOCK/snapshot.tar.zst"
 
 # ==============================================================================
-# OPTION 2: ERIGON ARCHIVE NODE (~1.6 TB) - For ALL queries including state
+# OPTION 2: RETH ARCHIVE NODE - Merkle.io (~1.34 TB compressed, ~2.4 TB extracted)
 # ==============================================================================
 
-# Erigon is much more storage-efficient for archive nodes
-# Geth Archive: ~18+ TB vs Erigon Archive: ~1.6 TB
-#
-# Erigon downloads snapshots via BitTorrent automatically when started.
-# No manual download needed - just start Erigon and it will sync.
-#
-# To run Erigon with automatic snapshot download:
-#   docker run -d --name erigon \
-#     -v /mnt/viper/erigon-data:/home/erigon/.local/share/erigon \
-#     -p 8545:8545 \
-#     thorax/erigon:latest \
-#     --chain=mainnet --snapshots=true
-
-# ==============================================================================
-# OPTION 3: RETH FULL NODE (~950 GB compressed)
-# ==============================================================================
-
-# PublicNode Reth Snapshots
-# Visit: https://publicnode.com/snapshots
-# - Reth v1.10.0 (~950 GB) updated every 24 hours
-
-# Merkle.io Reth Snapshots (~1.34 TB compressed, ~2.4 TB decompressed)
+# Merkle.io Reth Snapshots (archive)
 # Visit: https://www.merkle.io/snapshots
+# Direct downloads: https://snapshots.merkle.io/
 # - Updated every Monday and Thursday
+# - Format: tar.lz4
+# - Speed limit: 100 MB/s per connection
+#
+# Or use the built-in reth download command:
+#   reth download --chain mainnet --datadir /data/rpc_nodes/eth-data/reth
 
 # ==============================================================================
-# DOWNLOAD COMMANDS FOR GETH
+# OPTION 3: RETH FULL NODE - PublicNode (~950 GB compressed)
+# ==============================================================================
+
+# PublicNode Reth Snapshots (full node, NOT archive)
+# Visit: https://publicnode.com/snapshots
+# - Reth v1.10.0 (~950 GB) updated every 24-48 hours
+# - Also offers archive snapshots (~2.1 TB, v1.9.3, updated weekly)
+
+# ==============================================================================
+# DOWNLOAD COMMANDS FOR RETH (ethPandaOps)
 # ==============================================================================
 
 # Using aria2c (fastest, parallel download):
-#   BLOCK=$(curl -s https://snapshots.ethpandaops.io/mainnet/geth/latest)
-#   aria2c -x 16 -s 16 -d /mnt/viper/eth-data \
-#     "https://snapshots.ethpandaops.io/mainnet/geth/${BLOCK}/snapshot.tar.zst"
+#   set BLOCK (curl -s https://snapshots.ethpandaops.io/mainnet/reth/latest)
+#   aria2c -x 16 -s 16 -d /data/rpc_nodes/eth-data \
+#     "https://snapshots.ethpandaops.io/mainnet/reth/$BLOCK/snapshot.tar.zst"
 
 # Using wget with resume:
-#   BLOCK=$(curl -s https://snapshots.ethpandaops.io/mainnet/geth/latest)
-#   wget --continue -O /mnt/viper/eth-data/geth-snapshot.tar.zst \
-#     "https://snapshots.ethpandaops.io/mainnet/geth/${BLOCK}/snapshot.tar.zst"
+#   set BLOCK (curl -s https://snapshots.ethpandaops.io/mainnet/reth/latest)
+#   wget --continue -O /data/rpc_nodes/eth-data/reth-snapshot.tar.zst \
+#     "https://snapshots.ethpandaops.io/mainnet/reth/$BLOCK/snapshot.tar.zst"
 
 # Extract:
-#   tar -I zstd -xvf geth-snapshot.tar.zst -C /mnt/viper/eth-data/geth
+#   tar -I zstd -xvf reth-snapshot.tar.zst -C /data/rpc_nodes/eth-data/reth
 
 # ==============================================================================
 # CONSENSUS LAYER (Required for Ethereum post-merge)
@@ -96,14 +91,14 @@ https://snapshots.ethpandaops.io/mainnet/geth/24329506/snapshot.tar.zst
 # STORAGE REQUIREMENTS
 # ==============================================================================
 #
+# Reth Full Node:     ~2.4 TB (blocks + recent state)
+# Reth Archive Node:  ~2.4 TB (blocks + ALL state, very efficient)
 # Geth Full Node:     ~1.5 TB (blocks + recent state)
 # Geth Archive Node:  ~18+ TB (blocks + ALL state)
-# Erigon Archive:     ~1.6 TB (blocks + ALL state, much more efficient)
-# Reth Full Node:     ~2.4 TB
+# Erigon Archive:     ~1.6 TB (blocks + ALL state)
 # Consensus Layer:    ~200-400 GB
 #
-# RECOMMENDED: Erigon if you need historical state queries
-#              Geth if you only need blocks/txs/logs
+# RECOMMENDED: Reth for fast, storage-efficient archive node
 
 # ==============================================================================
 # SOURCES
@@ -111,5 +106,4 @@ https://snapshots.ethpandaops.io/mainnet/geth/24329506/snapshot.tar.zst
 # https://ethpandaops.io/data/snapshots/
 # https://publicnode.com/snapshots
 # https://www.merkle.io/snapshots
-# https://github.com/erigontech/erigon-snapshot
-# https://ethereum.org/developers/docs/nodes-and-clients/archive-nodes
+# https://reth.rs/cli/reth/download/
