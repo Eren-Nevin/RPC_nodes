@@ -1,0 +1,14 @@
+# Secrets and credentials
+*.hex
+.env
+private_nodes.env
+
+# Claude Code
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

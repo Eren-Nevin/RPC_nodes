@@ -1,0 +1,58 @@
+services:
+  # Execution Layer (Geth)
+  geth:
+    image: ethereum/client-go:v1.16.8
+    container_name: eth-geth
+    restart: unless-stopped
+    volumes:
+      - /mnt/viper/eth-data/geth:/root/.ethereum
+      - ./jwt.hex:/jwt.hex:ro
+    ports:
+      - "8555:8545"    # HTTP RPC
+      - "8556:8546"    # WebSocket
+      - "30303:30303"  # P2P TCP
+      - "30303:30303/udp"  # P2P UDP
+    command:
+      - --mainnet
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=8545
+      - --http.api=eth,net,web3,txpool
+      - --http.vhosts=*
+      - --http.corsdomain=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=8546
+      - --ws.api=eth,net,web3
+      - --ws.origins=*
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=8551
+      - --authrpc.vhosts=*
+      - --authrpc.jwtsecret=/jwt.hex
+      - --syncmode=snap
+      - --cache=4096
+
+  # Consensus Layer (Lighthouse)
+  lighthouse:
+    image: sigp/lighthouse:v8.0.1
+    container_name: eth-lighthouse
+    restart: unless-stopped
+    depends_on:
+      - geth
+    volumes:
+      - /mnt/viper/eth-data/lighthouse:/root/.lighthouse
+      - ./jwt.hex:/jwt.hex:ro
+    ports:
+      - "9100:9000"      # P2P TCP
+      - "9100:9000/udp"  # P2P UDP
+      - "5052:5052"      # Beacon API
+    command:
+      - lighthouse
+      - bn
+      - --network=mainnet
+      - --execution-endpoint=http://geth:8551
+      - --execution-jwt=/jwt.hex
+      - --checkpoint-sync-url=https://beaconstate.ethstaker.cc
+      - --http
+      - --http-address=0.0.0.0
+      - --http-port=5052

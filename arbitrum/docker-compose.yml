@@ -1,0 +1,23 @@
+services:
+  arbitrum:
+    image: offchainlabs/nitro-node:v3.9.4-7f582c3
+    container_name: arbitrum-one
+    restart: unless-stopped
+    volumes:
+      - /mnt/viper/arbitrum:/home/user/.arbitrum
+    ports:
+      - "8547:8547"    # HTTP RPC
+    command:
+      - --chain.id=42161
+      - --parent-chain.connection.url=${L1_RPC_URL}
+      - --parent-chain.blob-client.beacon-url=${L1_BEACON_URL}
+      - --node.staker.enable=false
+      - --http.api=net,web3,eth,debug
+      - --http.addr=0.0.0.0
+      - --http.port=8547
+      - --http.corsdomain=*
+      - --http.vhosts=*
+      - --execution.rpc.filter-timeout=30m
+      - --execution.rpc.filter-log-cache-size=128
+      - --execution.rpc.evm-timeout=30s
+      - --execution.rpc.log-history=0
