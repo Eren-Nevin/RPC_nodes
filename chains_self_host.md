@@ -12,7 +12,9 @@ Comprehensive comparison of storage requirements, hardware specs, and self-hosti
 | **Ethereum L1** | Archive | ~2.4 TB | ~2.4-3 TB | 32 GB | 15 GB/mo | Yes |
 | **Base** | Archive | 4.3 TB | ~7-8 TB | 32 GB | 200 GB/mo | Yes |
 | **Polygon** | Full | 5.7 TB | ~6-7 TB | 64 GB | 3 TB/mo | Yes |
-| **BSC** | Full | 4.8 TB | ~5-6 TB | 32 GB | 150 GB/mo | Yes |
+| **BSC** | Full (Geth) | 1 TB | ~1.5 TB | 32 GB | 150 GB/mo | Yes |
+| **BSC** | Full (Reth) | 4.3 TB | ~5-6 TB | 32 GB | 150 GB/mo | Yes |
+| **BSC** | Archive (Reth) | 9.7 TB | ~10+ TB | 32 GB | 150 GB/mo | Yes |
 | **Arbitrum** | Full | ~1.8 TB | ~2-3 TB | 16 GB | 200 GB/mo | Yes |
 | **Arbitrum** | Archive | N/A | ~15+ TB | 32 GB | 850 GB/mo | Difficult |
 | **TRON** | Full | ~2.3 TB | ~2.5-3 TB | 32 GB | 50 GB/mo | Yes |
@@ -262,19 +264,44 @@ https://mainnet-reth-archive-snapshots.base.org/latest
 
 ### BSC (BNB Chain)
 
-| Type | Size |
-|------|------|
-| Pruned | ~1.3 TB |
-| Full | ~4.8 TB |
-| Archive (Erigon) | ~5 TB |
+| Type | Client | Size |
+|------|--------|------|
+| Fast (Pruned) | Geth | ~375 GB |
+| Full | Geth | ~1 TB |
+| Full | Reth | ~4.3 TB |
+| Archive | Reth | ~9.7 TB |
 
 **Hardware:**
 - RAM: 32 GB
 - CPU: 8+ cores
 - Storage: NVMe SSD required
 
-**Snapshot Source:**
-- https://github.com/bnb-chain/bsc-snapshots
+**Snapshot Sources:**
+- 48Club (Geth + Reth): https://github.com/48Club/bsc-snapshots
+- BNB Chain (Geth): https://github.com/bnb-chain/bsc-snapshots
+
+**48Club Snapshot URLs:**
+| File | Size | URL |
+|------|------|-----|
+| geth.fast (pruned) | 375 GB | `https://complete.snapshots.48.club/geth.fast.77830000.tar.zst` |
+| geth.full | 1009 GB | `https://complete.snapshots.48.club/geth.full.77830000.tar.zst` |
+| reth.full | 4289 GB | `https://complete.snapshots.48.club/reth.full.70572117.tar.zst` |
+| reth.archive | 9701 GB | `https://complete.snapshots.48.club/reth.archive.70012269.tar.zst` |
+
+**Download:**
+```
+aria2c -s4 -x4 -k1024M -o snapshot.tar.zst $SNAPSHOT_URL
+```
+
+**Extract:**
+```
+pv snapshot.tar.zst | tar --use-compress-program="zstd -d --long=31" -xf -
+```
+
+**Verify:**
+```
+pv snapshot.tar.zst | openssl md5
+```
 
 ---
 

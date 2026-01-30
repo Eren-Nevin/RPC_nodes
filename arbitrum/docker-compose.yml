@@ -4,7 +4,7 @@ services:
     container_name: arbitrum-one
     restart: unless-stopped
     volumes:
-      - /mnt/viper/arbitrum:/home/user/.arbitrum
+      - /data/rpc_nodes/arbitrum:/home/user/.arbitrum
     ports:
       - "8547:8547"    # HTTP RPC
     command:

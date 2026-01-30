@@ -1,0 +1,54 @@
+services:
+  heimdall:
+    image: 0xpolygon/heimdall:2.0.0-beta4
+    container_name: polygon-heimdall
+    restart: unless-stopped
+    volumes:
+      - /data/rpc_nodes/polygon-data/heimdall:/heimdall-home
+    ports:
+      - "26656:26656"     # P2P
+      - "26657:26657"     # RPC
+    command:
+      - start
+      - --home=/heimdall-home
+      - --chain=mainnet
+      - --rest-server
+      - --seeds=1500161dd491b67fb1ac81868952be49e2509c9f@52.78.36.216:26656,dd4a3f1750af5765266231b9d8ac764599921736@3.36.224.80:26656,8ea4f592ad6cc38d7532aff418d1fb97052463af@34.240.245.39:26656,e772e1fb8c3492a9570a377a5eafdb1dc53cd778@54.194.245.5:26656
+      - --bor_rpc_url=http://bor:8545
+      - --eth_rpc_url=${ETH_RPC_URL}
+
+  bor:
+    image: 0xpolygon/bor:2.5.7
+    container_name: polygon-bor
+    restart: unless-stopped
+    depends_on:
+      - heimdall
+    volumes:
+      - /data/rpc_nodes/polygon-data/bor:/bor-home
+    ports:
+      - "8745:8545"       # HTTP RPC
+      - "8746:8546"       # WebSocket
+      - "30503:30303"     # P2P TCP
+      - "30503:30303/udp" # P2P UDP
+    command:
+      - server
+      - --datadir=/bor-home
+      - --chain=mainnet
+      - --syncmode=full
+      - --db.engine=pebble
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=8545
+      - --http.api=eth,net,web3,txpool,bor
+      - --http.corsdomain=*
+      - --http.vhosts=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=8546
+      - --ws.api=eth,net,web3
+      - --ws.origins=*
+      - --heimdall-url=http://heimdall:1317
+      - --bootnodes=enode://b8f1cc9c5d4403703fbf377116469667d2b1823c0daf16b7250aa576bacf399e42c3930ccfcb02c5c23b7c4571c8271c2df3bfb4b900b8e3483e0079ceb67ed4@52.78.36.216:30303,enode://8729e0c825f3d9cad382555f3e46dcff21af323e89025a0e6312df541f4a9e73abfa562d64906f5e59c51fe6f0501b3e61b07979606c56329c020ed739571e645@54.194.245.5:30303
+      - --maxpeers=50
+      - --cache=4096
+      - --txlookuplimit=0
