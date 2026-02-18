@@ -1,0 +1,29 @@
+services:
+  init:
+    image: alpine:3.21
+    container_name: rpc-init
+    restart: "no"
+    environment:
+      DATA_ROOT: /data/rpc_nodes
+    volumes:
+      - /data:/data
+      - ./init-data-dirs.sh:/init-data-dirs.sh:ro
+    command: sh /init-data-dirs.sh
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: rpc-nginx
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

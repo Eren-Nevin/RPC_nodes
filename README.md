@@ -2,6 +2,32 @@
 
 Self-hosted RPC node infrastructure for multiple blockchain networks. Each chain lives in its own directory with a `docker-compose.yml`, snapshot URLs, and helper scripts.
 
+---
+
+## Initial Setup
+
+```bash
+# 1. Clone with submodules
+git clone --recurse-submodules <repo-url>
+cd RPC_nodes
+
+# 2. Create data directories and start nginx
+#    (creates /data/rpc_nodes/** with correct ownership, then starts nginx)
+docker compose up -d
+```
+
+`docker compose up -d` runs two services:
+- **init** — creates all data directories under `/data/rpc_nodes/` with `chown 1000:1000`
+- **nginx** — starts the shared reverse proxy (depends on `init` completing first)
+
+To re-run just the directory init (e.g. after adding a new chain):
+
+```bash
+docker compose run --rm init
+```
+
+---
+
 ## Supported Chains
 
 | Chain | Clients | Type | Storage | Monthly Growth | RPC Port |
@@ -11,19 +37,15 @@ Self-hosted RPC node infrastructure for multiple blockchain networks. Each chain
 | Base (OP Stack) | Reth / Geth / Nethermind + op-node | Archive | ~7-8 TB | 50-100 GB/week | 8645 |
 | Polygon PoS | Bor + Heimdall | Full | ~6 TB | ~3 TB | 8745 |
 
-## Prerequisites
-
-- Docker and Docker Compose
-- Sufficient disk space (see table above; plan for **20-25 TB** total across all chains)
-- An Ethereum L1 RPC endpoint (e.g. Infura) -- required by Arbitrum, Base, and Polygon
-- An Ethereum Beacon API endpoint (e.g. PublicNode) -- required by Arbitrum and Base
-- `rclone` (for Polygon snapshot downloads)
-- `aria2c` and `lz4` (for BSC snapshot downloads)
+---
 
 ## Directory Layout
 
 ```
 .
+├── init-data-dirs.sh   # Creates /data/rpc_nodes/** (called by docker-compose init service)
+├── docker-compose.yml  # Root compose: init + nginx services
+├── download-snapshot   # Snapshot download/extract script (see below)
 ├── eth/                # Ethereum L1 (Reth + Lighthouse)
 ├── arbitrum/           # Arbitrum One (Nitro)
 ├── base/               # Base L2 (OP Stack, git submodule)
@@ -47,9 +69,10 @@ All chain data lives under `/data/rpc_nodes/`:
 ├── arbitrum/
 ├── base-data/
 │   └── reth/snapshots/mainnet/download/
-└── polygon-data/
-    ├── heimdall/
-    └── bor/
+├── polygon-data/
+│   ├── heimdall/data/
+│   └── bor/bor/chaindata/
+└── bsc-data/
 ```
 
 ---
@@ -75,7 +98,7 @@ Once running, nodes expose:
 
 ## Reverse Proxy (public access)
 
-All chains are exposed publicly through a single nginx container at **`rpc.defistream.dev`** using path-based routing. See [`nginx/`](nginx/) for the full setup.
+All chains are exposed publicly through a single nginx container at **`rpc.defistream.dev`** using path-based routing. The nginx service is part of the root `docker-compose.yml`. See [`nginx/`](nginx/) for the full config.
 
 | Public URL | Chain | Protocol |
 |-----------|-------|----------|
@@ -90,13 +113,65 @@ All chains are exposed publicly through a single nginx container at **`rpc.defis
 
 HTTP and WebSocket share the same URL — nginx detects `Upgrade: websocket` and routes to the correct backend port automatically.
 
-**Quick start:**
+Certificates are read from `/etc/letsencrypt/live/defistream.dev/` on the host (mounted read-only). The nginx container uses `network_mode: host` and reaches all node ports on `127.0.0.1` directly.
 
-```bash
-cd nginx && docker compose up -d
+---
+
+## Snapshot Download
+
+Use the `download-snapshot` script to download and extract snapshots for any supported chain.
+
+```
+./download-snapshot -n <node> [-t full|pruned] [-x] [-d <data-root>]
+
+  -n  Node (required): eth | arb | base | polygon
+  -t  Snapshot type: full (default) | pruned
+  -x  Extract-only: scan data dir for already-downloaded files and extract them
+  -d  Override data root (default: /data/rpc_nodes)
+  -h  Help
 ```
 
-Certificates are read from `/etc/letsencrypt/live/defistream.dev/` on the host (mounted read-only). The nginx container uses `network_mode: host` and reaches all node ports on `127.0.0.1` directly. RPC ports are not exposed publicly — only ports 80 and 443 need to be open in the firewall.
+**Required tools:** `aria2c`, `zstd`, `lz4`
+
+```bash
+# Install on Ubuntu/Debian
+apt-get install aria2 zstd lz4
+```
+
+### Per-chain snapshot support
+
+| Node | `full` | `pruned` | Source |
+|------|--------|----------|--------|
+| eth | ✅ ~2.4 TB | ❌ | ethPandaOps (auto-resolved) |
+| arb | ❌ | ✅ ~2-3 TB | Arbitrum Foundation (multi-part) |
+| base | ✅ ~7-8 TB | ✅ ~4-5 TB | base.org (auto-resolved) |
+| polygon | ✅ ~6 TB | ❌ | PublicNode (3 × lz4, auto-discovered) |
+
+### Examples
+
+```bash
+# Ethereum — download and extract full archive
+./download-snapshot -n eth
+
+# Arbitrum — pruned is the only option
+./download-snapshot -n arb -t pruned
+
+# Base — archive (full)
+./download-snapshot -n base -t full
+
+# Base — pruned / full-node size
+./download-snapshot -n base -t pruned
+
+# Polygon — downloads 3 lz4 files (heimdall + bor-base + bor-part)
+./download-snapshot -n polygon
+
+# Extract-only mode (files already downloaded, just extract)
+./download-snapshot -n eth -x
+./download-snapshot -n arb -t pruned -x
+./download-snapshot -n polygon -x
+```
+
+> **Tip:** Run inside `screen` or `tmux` — downloads can take many hours.
 
 ---
 
@@ -116,37 +191,17 @@ openssl rand -hex 32 > eth/jwt.hex
 
 #### 2. Download a snapshot (recommended)
 
-Syncing from genesis takes weeks. Use a snapshot instead.
-
-**Option A -- ethPandaOps Reth Archive (recommended):**
+Syncing from genesis takes weeks. Use the snapshot script instead:
 
 ```bash
-# Get the latest snapshot URL
-LATEST=$(curl -sL https://snapshots.ethpandaops.io/mainnet/reth/latest)
-URL="https://snapshots.ethpandaops.io/mainnet/reth/${LATEST}/snapshot.tar.zst"
-
-# Stream-extract directly to avoid needing 2x disk space
-curl -L "$URL" | pv | zstd -d | tar -xf - -C /data/rpc_nodes/eth-data/reth
+./download-snapshot -n eth
 ```
 
-**Option B -- Merkle.io Reth Archive:**
-- ~1.34 TB compressed, ~2.4 TB extracted (lz4)
-- Updated Monday and Thursday
-- Browse: https://snapshots.merkle.io/
+This resolves the latest ethPandaOps Reth archive URL automatically, downloads with aria2c (16 connections), extracts to `/data/rpc_nodes/eth-data/reth/`, and fixes ownership.
 
-**Option C -- PublicNode Reth Full Node:**
-- ~950 GB compressed
-- Updated every 24-48 hours
-- Browse: https://publicnode.com/snapshots
-
-> **Full vs Archive:** A full node stores all blocks, transactions, receipts, and logs. An archive node adds all historical state, which is required for historical `eth_call` at arbitrary block heights. Most use-cases only need a full node.
-
-#### 3. Fix ownership and start
+#### 3. Start
 
 ```bash
-# Snapshot data must be owned by UID 1000 (the user inside the container)
-sudo chown -R 1000:1000 /data/rpc_nodes/eth-data/reth
-
 cd eth
 docker compose up -d
 ```
@@ -188,20 +243,11 @@ You can also point `L1_RPC_URL` at your local Ethereum node (`http://<host>:8555
 
 #### 2. Download a snapshot
 
-Arbitrum provides multi-part pruned snapshots. Check `arbitrum/snapshot-urls.txt` for current URLs.
+Arbitrum provides multi-part pruned snapshots only (archive discontinued May 2024). URLs are stored in `arbitrum/snapshot-urls.txt`.
 
 ```bash
-# Download all parts
-for i in 0000 0001 0002 0003; do
-  wget "https://snapshot.arbitrum.foundation/arb1/<DATE>/pruned.tar.part${i}" \
-    -P /tmp/arb-snapshot/
-done
-
-# Combine and extract
-cat /tmp/arb-snapshot/pruned.tar.part* | tar -xf - -C /data/rpc_nodes/arbitrum
+./download-snapshot -n arb -t pruned
 ```
-
-> **Archive snapshots are discontinued** since May 2024 due to unsustainable growth (~850 GB/month). Only pruned snapshots are available.
 
 #### 3. Start
 
@@ -225,7 +271,7 @@ bash arbitrum/check-sync.sh
 #### Gotchas
 
 - The node requires **both** an L1 execution RPC and an L1 Beacon API endpoint.
-- `--node.staker.enable=false` -- this is a non-validating node. Do not enable staking unless you know what you're doing.
+- `--node.staker.enable=false` — this is a non-validating node. Do not enable staking unless you know what you're doing.
 - Log history is set to `0` (no historical state). This is a pruned node; you cannot do `eth_call` at old blocks.
 
 ---
@@ -267,12 +313,12 @@ openssl rand -hex 32
 #### 3. Download a snapshot
 
 ```bash
-# Stream the latest Reth archive snapshot directly
-SNAPSHOT_URL=$(curl -sL https://mainnet-reth-archive-snapshots.base.org/latest)
-curl -L "$SNAPSHOT_URL" | pv | zstd -d | tar -xf - -C /data/rpc_nodes/base-data/reth/snapshots/mainnet/download
-```
+# Archive (7-8 TB extracted)
+./download-snapshot -n base -t full
 
-This is ~4.3 TB compressed and expands to 7-8 TB.
+# Or pruned / full-node size
+./download-snapshot -n base -t pruned
+```
 
 #### 4. Start
 
@@ -308,7 +354,7 @@ curl -s http://localhost:7545 \
 - **Use Reth, not Geth** for archive nodes. Geth archive for Base grows to ~46 TB and is impractical.
 - The Base node runs **two containers**: an execution client and `op-node` (OP Stack consensus). Both must be running.
 - `OP_NODE_L2_ENGINE_AUTH_RAW` must be the **same** JWT token in both the execution client and op-node configs.
-- Sync mode is `execution-layer` -- the node syncs execution data and derives consensus from L1.
+- Sync mode is `execution-layer` — the node syncs execution data and derives consensus from L1.
 - The submodule pins a specific version. To update: `cd base/base-node && git fetch && git checkout <tag>`.
 - Growth is 50-100 GB/week; monitor disk usage.
 
@@ -332,32 +378,13 @@ ETH_RPC_URL=https://mainnet.infura.io/v3/<YOUR_KEY>
 
 Polygon needs **two separate snapshots**: one for Heimdall (~1 TB) and one for Bor (~4.7 TB). Total: ~6 TB.
 
-**Recommended: StakeCraft via rclone (stream-extract to save disk space)**
-
-First, configure rclone with the StakeCraft R2 bucket. Add to `~/.config/rclone/rclone.conf`:
-
-```ini
-[r2]
-type = s3
-provider = Cloudflare
-access_key_id = 849df1cd0e8666858df4b1e182a4b2cd
-secret_access_key = 568a53f5d4ca2b3d38780cd3e7a11ce2d6fe2887fbbe04405a96fc77021e917c
-endpoint = https://dd74dc687a5ce54107082a6849814c19.r2.cloudflarestorage.com
-```
-
-Then stream-extract both snapshots:
-
 ```bash
-# Heimdall (~1 TB)
-rclone cat "r2:sc-snapshots/heimdall-mainnet_2026-01-28.tar.gz" \
-  | pv | tar -xzf - -C /data/rpc_nodes/polygon-data/heimdall
-
-# Bor (~4.7 TB)
-rclone cat "r2:sc-snapshots/bor-pebble-mainnet_2026-01-26.tar" \
-  | pv | tar -xf - -C /data/rpc_nodes/polygon-data/bor/chaindata
+./download-snapshot -n polygon
 ```
 
-Check `polygon/snapshot-urls.txt` for updated snapshot dates and alternative providers (PublicNode, All4Nodes).
+This auto-discovers the latest PublicNode URLs (heimdall + bor-base + bor-part), downloads all three with aria2c (16 connections each), and extracts them to the correct directories. Falls back to `polygon/snapshot-urls.txt` if auto-discovery fails.
+
+See `polygon/snapshot-urls.txt` for alternative providers (StakeCraft rclone, all4nodes.io).
 
 #### 3. Start
 
@@ -386,7 +413,6 @@ curl -s http://localhost:26657/status
 - **Storage growth is extreme** (~3 TB/month). Archive mode is no longer practical. Plan for regular pruning or expanding storage.
 - Heimdall needs an Ethereum L1 RPC to verify checkpoints. This is the `ETH_RPC_URL` in `.env`.
 - Bor uses the `pebble` database engine with compression enabled to reduce disk usage.
-- Snapshot dates in `rclone` commands are point-in-time. Check the StakeCraft bucket for the latest: `rclone ls r2:sc-snapshots/ | grep polygon` or check `polygon/snapshot-urls.txt`.
 - Heimdall seeds are hardcoded in the compose file. If they become stale, check the [Polygon docs](https://wiki.polygon.technology/) for updated seeds.
 
 ---
@@ -395,8 +421,8 @@ curl -s http://localhost:26657/status
 
 Arbitrum, Base, and Polygon all require an Ethereum L1 RPC endpoint. You have two options:
 
-1. **External provider** (Infura, Alchemy, QuickNode, etc.) -- simpler, but adds a dependency and potential rate limits.
-2. **Your own Ethereum node** -- point `.env` files at `http://<eth-host>:8555` once the Ethereum node in this repo is synced. This is the recommended long-term setup.
+1. **External provider** (Infura, Alchemy, QuickNode, etc.) — simpler, but adds a dependency and potential rate limits.
+2. **Your own Ethereum node** — point `.env` files at `http://<eth-host>:8555` once the Ethereum node in this repo is synced. This is the recommended long-term setup.
 
 For Base and Arbitrum, you also need an **L1 Beacon API** endpoint. Options:
 - Your own Lighthouse: `http://<eth-host>:5052`
@@ -408,28 +434,15 @@ For Base and Arbitrum, you also need an **L1 Beacon API** endpoint. Options:
 
 ### Disk I/O
 
-NVMe SSDs are strongly recommended. Spinning disks and SATA SSDs will bottleneck sync and query performance. Snapshot extraction is also I/O-bound -- expect multi-hour extraction times even on NVMe.
+NVMe SSDs are strongly recommended. Spinning disks and SATA SSDs will bottleneck sync and query performance. Snapshot extraction is also I/O-bound — expect multi-hour extraction times even on NVMe.
 
 ### Snapshot streaming
 
-When possible, **stream-extract** snapshots rather than downloading then extracting. This avoids needing 2x the disk space:
-
-```bash
-# Good -- stream extract (needs 1x space)
-curl -L "$URL" | pv | zstd -d | tar -xf - -C /target
-
-# Bad -- download then extract (needs 2x space)
-wget "$URL" -O snapshot.tar.zst
-tar -xf snapshot.tar.zst -C /target
-```
+When possible, **stream-extract** snapshots rather than downloading then extracting. This avoids needing 2x the disk space. The `download-snapshot` script downloads first then extracts (supports resume via aria2c). For stream-extract, see the manual commands in each chain's `snapshot-urls.txt`.
 
 ### Container ownership
 
-Reth and other clients run as UID `1000` inside containers. After extracting snapshots, fix ownership:
-
-```bash
-sudo chown -R 1000:1000 /data/rpc_nodes/<chain-data>
-```
+Reth and other clients run as UID `1000` inside containers. The `download-snapshot` script runs `chown -R 1000:1000` automatically after extraction. The `init` service also sets correct ownership on all data directories at startup.
 
 ### Port conflicts
 
@@ -490,6 +503,8 @@ For Base (submodule): `cd base/base-node && git fetch --tags && git checkout <ne
 
 | Script | Location | Purpose |
 |--------|----------|---------|
+| `download-snapshot` | root | Download and extract snapshots for any chain |
+| `init-data-dirs.sh` | root | Create `/data/rpc_nodes/**` with correct ownership |
 | `start-after-extract.sh` | `eth/` | Monitors snapshot extraction, fixes ownership, auto-starts Ethereum node |
 | `check-sync.sh` | `arbitrum/` | Polls sync status every 60s with desktop notification on completion |
 | `fetch-snapshot.sh` | `bsc/` | Downloads, verifies, and extracts BSC snapshots (aria2c + lz4) |
@@ -503,18 +518,21 @@ For Base (submodule): `cd base/base-node && git fetch --tags && git checkout <ne
 git clone --recurse-submodules <repo-url>
 cd RPC_nodes
 
-# 2. Create data directories
-sudo mkdir -p /data/rpc_nodes/{eth-data/{reth,lighthouse},arbitrum,base-data,polygon-data/{heimdall,bor}}
-sudo chown -R 1000:1000 /data/rpc_nodes
+# 2. Create data directories and start nginx
+docker compose up -d
 
 # 3. Set up .env files with your L1 endpoints
 #    - arbitrum/.env
 #    - polygon/.env
 #    - base/base-node/.env.custom (or .env.mainnet)
 
-# 4. Download snapshots for each chain (see per-chain sections above)
+# 4. Download snapshots (each takes many hours — run in screen/tmux)
+./download-snapshot -n eth
+./download-snapshot -n arb -t pruned
+./download-snapshot -n base -t full
+./download-snapshot -n polygon
 
-# 5. Start all nodes
+# 5. Start each chain node
 cd eth && docker compose up -d && cd ..
 cd arbitrum && docker compose up -d && cd ..
 cd base/base-node && CLIENT=reth NETWORK_ENV=.env.custom docker compose up --build -d && cd ../..

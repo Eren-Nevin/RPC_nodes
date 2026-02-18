@@ -1,0 +1,352 @@
+#!/usr/bin/env bash
+# download-snapshot — download and extract blockchain node snapshots
+#
+# Usage:
+#   ./download-snapshot -n <node> [-t full|pruned] [-x] [-d <data-root>]
+#
+# Options:
+#   -n  Node name (required): eth | arb | base | polygon
+#   -t  Snapshot type: full (default) | pruned
+#   -x  Extract-only mode: scan data dir for already-downloaded files and extract them
+#   -d  Override data root (default: /data/rpc_nodes)
+#   -h  Show this help
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ─── defaults ─────────────────────────────────────────────────────────────────
+NODE=""
+TYPE="full"
+EXTRACT_ONLY=false
+DATA_ROOT="/data/rpc_nodes"
+
+# ─── usage ────────────────────────────────────────────────────────────────────
+usage() {
+  grep '^#' "$0" | sed 's/^# \?//' | head -20
+  exit "${1:-0}"
+}
+
+# ─── argument parsing ─────────────────────────────────────────────────────────
+while getopts "n:t:xd:h" opt; do
+  case "$opt" in
+    n) NODE="$OPTARG" ;;
+    t) TYPE="$OPTARG" ;;
+    x) EXTRACT_ONLY=true ;;
+    d) DATA_ROOT="$OPTARG" ;;
+    h) usage 0 ;;
+    *) usage 1 ;;
+  esac
+done
+
+# ─── validate args ────────────────────────────────────────────────────────────
+if [[ -z "$NODE" ]]; then
+  echo "ERROR: -n <node> is required (eth | arb | base | polygon)" >&2
+  usage 1
+fi
+
+case "$NODE" in
+  eth|arb|base|polygon) ;;
+  *) echo "ERROR: Unknown node '${NODE}'. Must be one of: eth arb base polygon" >&2; exit 1 ;;
+esac
+
+case "$TYPE" in
+  full|pruned) ;;
+  *) echo "ERROR: Unknown type '${TYPE}'. Must be full or pruned." >&2; exit 1 ;;
+esac
+
+# ─── tool checks ─────────────────────────────────────────────────────────────
+check_tool() {
+  if ! command -v "$1" &>/dev/null; then
+    echo "ERROR: Required tool '$1' is not installed." >&2
+    exit 1
+  fi
+}
+
+check_tool aria2c
+check_tool zstd
+check_tool lz4
+
+# ─── helpers ──────────────────────────────────────────────────────────────────
+download() {
+  local url="$1"
+  local dest_dir="$2"
+  local filename
+  filename="$(basename "$url")"
+  echo "==> Downloading: $url"
+  echo "    → ${dest_dir}/${filename}"
+  aria2c -x 16 -s 16 --file-allocation=none \
+    --continue=true \
+    -d "$dest_dir" \
+    "$url"
+}
+
+extract_zst() {
+  local file="$1"
+  local dest="$2"
+  echo "==> Extracting (zstd): $file → $dest"
+  mkdir -p "$dest"
+  zstd -d --stdout "$file" | tar -xf - -C "$dest"
+}
+
+extract_lz4() {
+  local file="$1"
+  local dest="$2"
+  echo "==> Extracting (lz4): $file → $dest"
+  mkdir -p "$dest"
+  lz4 -dc "$file" | tar -xf - -C "$dest"
+}
+
+fix_ownership() {
+  local dir="$1"
+  echo "==> Fixing ownership (1000:1000): $dir"
+  chown -R 1000:1000 "$dir"
+}
+
+# ─── per-chain logic ──────────────────────────────────────────────────────────
+
+# ── ETH ───────────────────────────────────────────────────────────────────────
+do_eth() {
+  if [[ "$TYPE" == "pruned" ]]; then
+    echo "ERROR: eth only supports 'full' snapshots (ethPandaOps archive)." >&2
+    exit 1
+  fi
+
+  local dest="${DATA_ROOT}/eth-data"
+  local extract_to="${DATA_ROOT}/eth-data/reth"
+
+  if [[ "$EXTRACT_ONLY" == true ]]; then
+    local found=()
+    while IFS= read -r -d '' f; do found+=("$f"); done \
+      < <(find "$dest" -maxdepth 1 -name "*.tar.zst" -print0 2>/dev/null)
+    if [[ ${#found[@]} -eq 0 ]]; then
+      echo "ERROR: No *.tar.zst files found in $dest" >&2
+      exit 1
+    fi
+    for f in "${found[@]}"; do
+      extract_zst "$f" "$extract_to"
+    done
+    fix_ownership "$extract_to"
+    return
+  fi
+
+  echo "==> Resolving latest ethPandaOps Reth snapshot ..."
+  local latest
+  latest="$(curl -sSfL https://snapshots.ethpandaops.io/mainnet/reth/latest)"
+  local url="https://snapshots.ethpandaops.io/mainnet/reth/${latest}/snapshot.tar.zst"
+  echo "==> Resolved: $url"
+
+  mkdir -p "$dest"
+  download "$url" "$dest"
+
+  echo "==> Extracting ..."
+  extract_zst "${dest}/snapshot.tar.zst" "$extract_to"
+  fix_ownership "$extract_to"
+}
+
+# ── ARB ───────────────────────────────────────────────────────────────────────
+do_arb() {
+  if [[ "$TYPE" == "full" ]]; then
+    echo "ERROR: arb only supports 'pruned' snapshots (archive discontinued May 2024)." >&2
+    exit 1
+  fi
+
+  local dest="${DATA_ROOT}/arbitrum"
+  local urls_file="${SCRIPT_DIR}/arbitrum/snapshot-urls.txt"
+
+  if [[ ! -f "$urls_file" ]]; then
+    echo "ERROR: $urls_file not found." >&2
+    exit 1
+  fi
+
+  # Read non-comment, non-empty URLs
+  mapfile -t urls < <(grep -v '^#' "$urls_file" | grep -v '^[[:space:]]*$')
+
+  if [[ ${#urls[@]} -eq 0 ]]; then
+    echo "ERROR: No URLs found in $urls_file" >&2
+    exit 1
+  fi
+
+  if [[ "$EXTRACT_ONLY" == true ]]; then
+    local parts=()
+    while IFS= read -r -d '' f; do parts+=("$f"); done \
+      < <(find "$dest" -maxdepth 1 -name "pruned.tar.part*" -print0 2>/dev/null | sort -z)
+    if [[ ${#parts[@]} -eq 0 ]]; then
+      echo "ERROR: No pruned.tar.part* files found in $dest" >&2
+      exit 1
+    fi
+    echo "==> Combining ${#parts[@]} parts and extracting to $dest ..."
+    cat "${parts[@]}" | tar -xf - -C "$dest"
+    fix_ownership "$dest"
+    return
+  fi
+
+  echo "==> Downloading ${#urls[@]} Arbitrum snapshot parts ..."
+  mkdir -p "$dest"
+  for url in "${urls[@]}"; do
+    download "$url" "$dest"
+  done
+
+  echo "==> Combining parts and extracting to $dest ..."
+  local parts=()
+  while IFS= read -r -d '' f; do parts+=("$f"); done \
+    < <(find "$dest" -maxdepth 1 -name "pruned.tar.part*" -print0 2>/dev/null | sort -z)
+  cat "${parts[@]}" | tar -xf - -C "$dest"
+  fix_ownership "$dest"
+}
+
+# ── BASE ──────────────────────────────────────────────────────────────────────
+do_base() {
+  local extract_to="${DATA_ROOT}/base-data/reth/snapshots/mainnet/download"
+  local dest="${DATA_ROOT}/base-data"
+
+  if [[ "$EXTRACT_ONLY" == true ]]; then
+    local found=()
+    while IFS= read -r -d '' f; do found+=("$f"); done \
+      < <(find "$dest" -maxdepth 1 -name "*.tar.zst" -print0 2>/dev/null)
+    if [[ ${#found[@]} -eq 0 ]]; then
+      echo "ERROR: No *.tar.zst files found in $dest" >&2
+      exit 1
+    fi
+    for f in "${found[@]}"; do
+      extract_zst "$f" "$extract_to"
+    done
+    fix_ownership "$extract_to"
+    return
+  fi
+
+  local api_url
+  case "$TYPE" in
+    full)
+      api_url="https://mainnet-reth-archive-snapshots.base.org/latest"
+      echo "==> Resolving latest Base archive (full) snapshot ..."
+      ;;
+    pruned)
+      api_url="https://mainnet-reth-full-snapshots.base.org/latest"
+      echo "==> Resolving latest Base full (pruned) snapshot ..."
+      ;;
+  esac
+
+  local snapshot_url
+  snapshot_url="$(curl -sSfL "$api_url")"
+  echo "==> Resolved: $snapshot_url"
+
+  mkdir -p "$dest"
+  download "$snapshot_url" "$dest"
+
+  local filename
+  filename="$(basename "$snapshot_url")"
+  echo "==> Extracting ..."
+  extract_zst "${dest}/${filename}" "$extract_to"
+  fix_ownership "$extract_to"
+}
+
+# ── POLYGON ───────────────────────────────────────────────────────────────────
+do_polygon() {
+  if [[ "$TYPE" == "pruned" ]]; then
+    echo "ERROR: polygon only supports 'full' snapshots." >&2
+    exit 1
+  fi
+
+  local heimdall_dest="${DATA_ROOT}/polygon-data/heimdall/data"
+  local bor_dest="${DATA_ROOT}/polygon-data/bor/bor/chaindata"
+  local dl_dir="${DATA_ROOT}/polygon-data"
+
+  if [[ "$EXTRACT_ONLY" == true ]]; then
+    local found=()
+    while IFS= read -r -d '' f; do found+=("$f"); done \
+      < <(find "$dl_dir" -maxdepth 1 -name "*.tar.lz4" -print0 2>/dev/null)
+    if [[ ${#found[@]} -eq 0 ]]; then
+      echo "ERROR: No *.tar.lz4 files found in $dl_dir" >&2
+      exit 1
+    fi
+    for f in "${found[@]}"; do
+      local fname
+      fname="$(basename "$f")"
+      if [[ "$fname" == *heimdall* ]]; then
+        extract_lz4 "$f" "$heimdall_dest"
+      else
+        # bor-base and bor-part both go to chaindata
+        extract_lz4 "$f" "$bor_dest"
+      fi
+    done
+    fix_ownership "${DATA_ROOT}/polygon-data"
+    return
+  fi
+
+  # Try to auto-discover from publicnode.com/snapshots listing
+  echo "==> Attempting auto-discovery of Polygon snapshots from publicnode.com ..."
+  local heimdall_url="" bor_base_url="" bor_part_url=""
+
+  local listing
+  listing="$(curl -sSf "https://publicnode.com/snapshots" 2>/dev/null || true)"
+
+  if [[ -n "$listing" ]]; then
+    heimdall_url="$(echo "$listing" | grep -oE 'https://snapshots\.publicnode\.com/polygon-heimdall-[0-9]+-[0-9]+\.tar\.lz4' | head -1 || true)"
+    bor_base_url="$(echo "$listing" | grep -oE 'https://snapshots\.publicnode\.com/polygon-bor-base-[0-9]+-[0-9]+\.tar\.lz4' | head -1 || true)"
+    bor_part_url="$(echo "$listing" | grep -oE 'https://snapshots\.publicnode\.com/polygon-bor-part-[0-9]+-[0-9]+\.tar\.lz4' | head -1 || true)"
+  fi
+
+  # Fallback: parse snapshot-urls.txt
+  if [[ -z "$heimdall_url" || -z "$bor_base_url" || -z "$bor_part_url" ]]; then
+    echo "==> Auto-discovery incomplete, falling back to polygon/snapshot-urls.txt ..."
+    local urls_file="${SCRIPT_DIR}/polygon/snapshot-urls.txt"
+    if [[ ! -f "$urls_file" ]]; then
+      echo "ERROR: $urls_file not found and auto-discovery failed." >&2
+      exit 1
+    fi
+
+    if [[ -z "$heimdall_url" ]]; then
+      heimdall_url="$(grep -oE 'https://snapshots\.publicnode\.com/polygon-heimdall-[0-9]+-[0-9]+\.tar\.lz4' "$urls_file" | head -1 || true)"
+    fi
+    if [[ -z "$bor_base_url" ]]; then
+      bor_base_url="$(grep -oE 'https://snapshots\.publicnode\.com/polygon-bor-base-[0-9]+-[0-9]+\.tar\.lz4' "$urls_file" | head -1 || true)"
+    fi
+    if [[ -z "$bor_part_url" ]]; then
+      bor_part_url="$(grep -oE 'https://snapshots\.publicnode\.com/polygon-bor-part-[0-9]+-[0-9]+\.tar\.lz4' "$urls_file" | head -1 || true)"
+    fi
+  fi
+
+  if [[ -z "$heimdall_url" || -z "$bor_base_url" || -z "$bor_part_url" ]]; then
+    echo "ERROR: Could not resolve all three Polygon snapshot URLs." >&2
+    echo "  heimdall : ${heimdall_url:-<not found>}" >&2
+    echo "  bor-base : ${bor_base_url:-<not found>}" >&2
+    echo "  bor-part : ${bor_part_url:-<not found>}" >&2
+    echo "Update polygon/snapshot-urls.txt with current publicnode.com URLs." >&2
+    exit 1
+  fi
+
+  echo "==> Resolved URLs:"
+  echo "    heimdall : $heimdall_url"
+  echo "    bor-base : $bor_base_url"
+  echo "    bor-part : $bor_part_url"
+
+  mkdir -p "$heimdall_dest" "$bor_dest" "$dl_dir"
+
+  download "$heimdall_url" "$dl_dir"
+  download "$bor_base_url" "$dl_dir"
+  download "$bor_part_url" "$dl_dir"
+
+  echo "==> Extracting Heimdall snapshot ..."
+  extract_lz4 "${dl_dir}/$(basename "$heimdall_url")" "$heimdall_dest"
+
+  echo "==> Extracting Bor base snapshot ..."
+  extract_lz4 "${dl_dir}/$(basename "$bor_base_url")" "$bor_dest"
+
+  echo "==> Extracting Bor incremental snapshot ..."
+  extract_lz4 "${dl_dir}/$(basename "$bor_part_url")" "$bor_dest"
+
+  fix_ownership "${DATA_ROOT}/polygon-data"
+}
+
+# ─── dispatch ─────────────────────────────────────────────────────────────────
+echo "=== download-snapshot: node=${NODE} type=${TYPE} extract_only=${EXTRACT_ONLY} data_root=${DATA_ROOT} ==="
+
+case "$NODE" in
+  eth)     do_eth ;;
+  arb)     do_arb ;;
+  base)    do_base ;;
+  polygon) do_polygon ;;
+esac
+
+echo "=== Done ==="
