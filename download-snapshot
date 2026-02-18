@@ -229,7 +229,7 @@ do_base() {
       echo "==> Resolving latest Base archive (full) snapshot ..."
       ;;
     pruned)
-      base_url="https://mainnet-reth-full-snapshots.base.org"
+      base_url="https://mainnet-reth-pruned-snapshots.base.org"
       api_url="${base_url}/latest"
       echo "==> Resolving latest Base full (pruned) snapshot ..."
       ;;
