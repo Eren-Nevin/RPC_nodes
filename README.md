@@ -341,25 +341,18 @@ git submodule update --init --recursive
 
 #### 2. Configure environment
 
-Create or edit `base/base-node/.env.custom` (or use the existing `.env.mainnet`):
+```bash
+cp base/.env.example base/.env
+# then edit OP_NODE_L1_ETH_RPC if not using the local eth node
+```
+
+`base/.env` has a single variable:
 
 ```env
-CLIENT=reth
-HOST_DATA_DIR=/data/rpc_nodes/base-data/reth/snapshots/mainnet/download
-NETWORK_ENV=.env.custom
-
-OP_NODE_L1_ETH_RPC=https://mainnet.infura.io/v3/<YOUR_KEY>
-OP_NODE_L1_BEACON=https://ethereum-beacon-api.publicnode.com
-OP_NODE_L1_RPC_KIND=infura
-
-OP_NODE_L2_ENGINE_AUTH_RAW=<random 64-char hex>
+OP_NODE_L1_ETH_RPC=http://172.17.0.1:8555
 ```
 
-Generate the engine JWT:
-
-```bash
-openssl rand -hex 32
-```
+All other settings (JWT, network, P2P bootnodes, beacon URLs, etc.) are pre-configured defaults in `base/docker-compose.yml`.
 
 #### 3. Download a snapshot
 
@@ -374,16 +367,8 @@ openssl rand -hex 32
 #### 4. Start
 
 ```bash
-cd base/base-node
-
-# Reth on mainnet (recommended)
-CLIENT=reth NETWORK_ENV=.env.custom docker compose up --build -d
-
-# Or Geth on mainnet
-docker compose up --build -d
-
-# Or Nethermind on Sepolia testnet
-CLIENT=nethermind NETWORK_ENV=.env.sepolia docker compose up --build -d
+cd base
+docker compose up -d
 ```
 
 #### 5. Verify
@@ -404,7 +389,7 @@ curl -s http://localhost:7545 \
 
 - **Use Reth, not Geth** for archive nodes. Geth archive for Base grows to ~46 TB and is impractical.
 - The Base node runs **two containers**: an execution client and `op-node` (OP Stack consensus). Both must be running.
-- `OP_NODE_L2_ENGINE_AUTH_RAW` must be the **same** JWT token in both the execution client and op-node configs.
+- The JWT (`OP_NODE_L2_ENGINE_AUTH_RAW`) is pre-set in `docker-compose.yml` and shared automatically between the execution client and op-node — no manual generation needed.
 - Sync mode is `execution-layer` — the node syncs execution data and derives consensus from L1.
 - The submodule pins a specific version. To update: `cd base/base-node && git fetch && git checkout <tag>`.
 - Growth is 50-100 GB/week; monitor disk usage.
@@ -584,6 +569,6 @@ docker compose up -d
 # 5. Start each chain node
 cd eth && docker compose up -d && cd ..
 cd arbitrum && docker compose up -d && cd ..
-cd base/base-node && CLIENT=reth NETWORK_ENV=.env.custom docker compose up --build -d && cd ../..
+cd base && docker compose up -d && cd ..
 cd polygon && docker compose up -d && cd ..
 ```
