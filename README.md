@@ -189,7 +189,7 @@ apt-get install aria2 zstd lz4
 | Node | `full` | `pruned` | Source |
 |------|--------|----------|--------|
 | eth | ✅ ~2.4 TB | ❌ | ethPandaOps (auto-resolved) |
-| arb | ❌ | ✅ ~2-3 TB | Arbitrum Foundation (multi-part) |
+| arb | ❌ | ✅ ~2-3 TB | PublicNode (base + part lz4, auto-discovered) |
 | base | ✅ ~7-8 TB | ✅ ~4-5 TB | base.org (auto-resolved) |
 | polygon | ✅ ~6 TB | ❌ | PublicNode (3 × lz4, auto-discovered) |
 
@@ -287,7 +287,7 @@ L1_RPC_URL=http://172.17.0.1:8555
 
 #### 2. Download a snapshot
 
-Arbitrum provides multi-part pruned snapshots only (archive discontinued May 2024). URLs are stored in `arbitrum/snapshot-urls.txt`.
+Arbitrum pruned snapshots are sourced from PublicNode (lz4 format, archive discontinued May 2024). The script auto-discovers current URLs from `publicnode.com/snapshots` and falls back to `arbitrum/snapshot-urls.txt`.
 
 ```bash
 sudo ./download-snapshot -n arb -t pruned

@@ -1,4 +1,5 @@
-https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0000
-https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0001
-https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0002
-https://snapshot.arbitrum.foundation/arb1/2026-01-17-4d52ed3d/pruned.tar.part0003
+# Arbitrum One pruned snapshots from PublicNode
+# Auto-discovery reads publicnode.com/snapshots; update these as fallback when that fails.
+# Source: https://publicnode.com/snapshots
+https://snapshots.publicnode.com/arbitrum-base-0-407447342.tar.lz4
+https://snapshots.publicnode.com/arbitrum-part-407447343-432845049.tar.lz4

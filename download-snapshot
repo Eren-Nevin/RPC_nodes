@@ -159,46 +159,72 @@ do_arb() {
   fi
 
   local dest="${DATA_ROOT}/arbitrum"
-  local urls_file="${SCRIPT_DIR}/arbitrum/snapshot-urls.txt"
-
-  if [[ ! -f "$urls_file" ]]; then
-    echo "ERROR: $urls_file not found." >&2
-    exit 1
-  fi
-
-  # Read non-comment, non-empty URLs
-  mapfile -t urls < <(grep -v '^#' "$urls_file" | grep -v '^[[:space:]]*$')
-
-  if [[ ${#urls[@]} -eq 0 ]]; then
-    echo "ERROR: No URLs found in $urls_file" >&2
-    exit 1
-  fi
 
   if [[ "$EXTRACT_ONLY" == true ]]; then
-    local parts=()
-    while IFS= read -r -d '' f; do parts+=("$f"); done \
-      < <(find "$dest" -maxdepth 1 -name "pruned.tar.part*" -print0 2>/dev/null | sort -z)
-    if [[ ${#parts[@]} -eq 0 ]]; then
-      echo "ERROR: No pruned.tar.part* files found in $dest" >&2
+    local found=()
+    while IFS= read -r -d '' f; do found+=("$f"); done \
+      < <(find "$dest" -maxdepth 1 -name "*.tar.lz4" -print0 2>/dev/null)
+    if [[ ${#found[@]} -eq 0 ]]; then
+      echo "ERROR: No *.tar.lz4 files found in $dest" >&2
       exit 1
     fi
-    echo "==> Combining ${#parts[@]} parts and extracting to $dest ..."
-    cat "${parts[@]}" | tar -xf - -C "$dest"
+    for f in "${found[@]}"; do
+      extract_lz4 "$f" "$dest"
+    done
     fix_ownership "$dest"
     return
   fi
 
-  echo "==> Downloading ${#urls[@]} Arbitrum snapshot parts ..."
-  mkdir -p "$dest"
-  for url in "${urls[@]}"; do
-    download "$url" "$dest"
-  done
+  # Try to auto-discover from publicnode.com
+  echo "==> Attempting auto-discovery of Arbitrum snapshots from publicnode.com ..."
+  local base_url="" part_url=""
 
-  echo "==> Combining parts and extracting to $dest ..."
-  local parts=()
-  while IFS= read -r -d '' f; do parts+=("$f"); done \
-    < <(find "$dest" -maxdepth 1 -name "pruned.tar.part*" -print0 2>/dev/null | sort -z)
-  cat "${parts[@]}" | tar -xf - -C "$dest"
+  local listing
+  listing="$(curl -sSf "https://publicnode.com/snapshots" 2>/dev/null || true)"
+
+  if [[ -n "$listing" ]]; then
+    base_url="$(echo "$listing" | grep -oE 'https://snapshots\.publicnode\.com/arbitrum-base-[0-9]+-[0-9]+\.tar\.lz4' | head -1 || true)"
+    part_url="$(echo "$listing" | grep -oE 'https://snapshots\.publicnode\.com/arbitrum-part-[0-9]+-[0-9]+\.tar\.lz4' | head -1 || true)"
+  fi
+
+  # Fallback: parse snapshot-urls.txt
+  if [[ -z "$base_url" || -z "$part_url" ]]; then
+    echo "==> Auto-discovery incomplete, falling back to arbitrum/snapshot-urls.txt ..."
+    local urls_file="${SCRIPT_DIR}/arbitrum/snapshot-urls.txt"
+    if [[ ! -f "$urls_file" ]]; then
+      echo "ERROR: $urls_file not found and auto-discovery failed." >&2
+      exit 1
+    fi
+    if [[ -z "$base_url" ]]; then
+      base_url="$(grep -oE 'https://snapshots\.publicnode\.com/arbitrum-base-[0-9]+-[0-9]+\.tar\.lz4' "$urls_file" | head -1 || true)"
+    fi
+    if [[ -z "$part_url" ]]; then
+      part_url="$(grep -oE 'https://snapshots\.publicnode\.com/arbitrum-part-[0-9]+-[0-9]+\.tar\.lz4' "$urls_file" | head -1 || true)"
+    fi
+  fi
+
+  if [[ -z "$base_url" || -z "$part_url" ]]; then
+    echo "ERROR: Could not resolve Arbitrum snapshot URLs." >&2
+    echo "  base : ${base_url:-<not found>}" >&2
+    echo "  part : ${part_url:-<not found>}" >&2
+    echo "Update arbitrum/snapshot-urls.txt with current publicnode.com URLs." >&2
+    exit 1
+  fi
+
+  echo "==> Resolved URLs:"
+  echo "    base : $base_url"
+  echo "    part : $part_url"
+
+  mkdir -p "$dest"
+  download "$base_url" "$dest"
+  download "$part_url" "$dest"
+
+  echo "==> Extracting base snapshot ..."
+  extract_lz4 "${dest}/$(basename "$base_url")" "$dest"
+
+  echo "==> Extracting incremental snapshot ..."
+  extract_lz4 "${dest}/$(basename "$part_url")" "$dest"
+
   fix_ownership "$dest"
 }
 
