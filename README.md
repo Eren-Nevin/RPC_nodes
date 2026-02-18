@@ -331,6 +331,8 @@ Base uses the official [base/node](https://github.com/base/node) repository as a
 
 #### 1. Initialize the submodule
 
+Submodule source: `https://github.com/base/node.git`
+
 ```bash
 git submodule update --init --recursive
 ```
