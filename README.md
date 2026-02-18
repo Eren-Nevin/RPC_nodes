@@ -29,6 +29,7 @@ Self-hosted RPC node infrastructure for multiple blockchain networks. Each chain
 ├── base/               # Base L2 (OP Stack, git submodule)
 ├── polygon/            # Polygon PoS (Bor + Heimdall)
 ├── bsc/                # BSC (snapshot tooling, WIP)
+├── nginx/              # Shared reverse proxy (rpc.defistream.dev)
 ├── chains_self_host.md # Detailed hardware/software specs for 22+ chains
 ├── RPC_ENDPOINTS.md    # Port mapping reference
 └── RPC_NODE.md         # Deployment template / version pinning
@@ -69,6 +70,37 @@ Once running, nodes expose:
 | Polygon | HTTP | 8745 | `http://localhost:8745` |
 | Polygon | WebSocket | 8746 | `ws://localhost:8746` |
 | Polygon | Heimdall | 26657 | `http://localhost:26657` |
+
+---
+
+## Reverse Proxy (public access)
+
+All chains are exposed publicly through a single nginx container at **`rpc.defistream.dev`** using path-based routing. See [`nginx/`](nginx/) for the full setup.
+
+| Public URL | Chain | Protocol |
+|-----------|-------|----------|
+| `https://rpc.defistream.dev/eth` | Ethereum | HTTP JSON-RPC |
+| `wss://rpc.defistream.dev/eth` | Ethereum | WebSocket |
+| `https://rpc.defistream.dev/arbitrum` | Arbitrum One | HTTP JSON-RPC |
+| `wss://rpc.defistream.dev/arbitrum` | Arbitrum One | WebSocket |
+| `https://rpc.defistream.dev/base` | Base | HTTP JSON-RPC |
+| `wss://rpc.defistream.dev/base` | Base | WebSocket |
+| `https://rpc.defistream.dev/polygon` | Polygon PoS | HTTP JSON-RPC |
+| `wss://rpc.defistream.dev/polygon` | Polygon PoS | WebSocket |
+
+HTTP and WebSocket share the same URL — nginx detects `Upgrade: websocket` and routes to the correct backend port automatically.
+
+**Quick start:**
+
+```bash
+# Place certs first
+cp /path/to/rpc.defistream.dev.crt nginx/certs/
+cp /path/to/rpc.defistream.dev.key nginx/certs/
+
+cd nginx && docker compose up -d
+```
+
+The nginx container uses `network_mode: host` and reaches all node ports on `127.0.0.1` directly. RPC ports are not exposed publicly — only ports 80 and 443 need to be open in the firewall.
 
 ---
 
