@@ -231,6 +231,7 @@ do_arb() {
 # ── BASE ──────────────────────────────────────────────────────────────────────
 do_base() {
   local dest="${DATA_ROOT}/base-data"
+  local extract_to="${DATA_ROOT}/base-data/reth"
 
   if [[ "$EXTRACT_ONLY" == true ]]; then
     local found=()
@@ -241,9 +242,9 @@ do_base() {
       exit 1
     fi
     for f in "${found[@]}"; do
-      extract_zst "$f" "$dest"
+      extract_zst "$f" "$extract_to"
     done
-    fix_ownership "$dest"
+    fix_ownership "$extract_to"
     return
   fi
 
@@ -266,12 +267,12 @@ do_base() {
   snapshot_url="${base_url}/${filename}"
   echo "==> Resolved: $snapshot_url"
 
-  mkdir -p "$dest"
+  mkdir -p "$extract_to"
   download "$snapshot_url" "$dest"
 
   echo "==> Extracting ..."
-  extract_zst "${dest}/${filename}" "$dest"
-  fix_ownership "$dest"
+  extract_zst "${dest}/${filename}" "$extract_to"
+  fix_ownership "$extract_to"
 }
 
 # ── POLYGON ───────────────────────────────────────────────────────────────────
