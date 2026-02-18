@@ -93,14 +93,10 @@ HTTP and WebSocket share the same URL — nginx detects `Upgrade: websocket` and
 **Quick start:**
 
 ```bash
-# Place certs first
-cp /path/to/rpc.defistream.dev.crt nginx/certs/
-cp /path/to/rpc.defistream.dev.key nginx/certs/
-
 cd nginx && docker compose up -d
 ```
 
-The nginx container uses `network_mode: host` and reaches all node ports on `127.0.0.1` directly. RPC ports are not exposed publicly — only ports 80 and 443 need to be open in the firewall.
+Certificates are read from `/etc/letsencrypt/live/defistream.dev/` on the host (mounted read-only). The nginx container uses `network_mode: host` and reaches all node ports on `127.0.0.1` directly. RPC ports are not exposed publicly — only ports 80 and 443 need to be open in the firewall.
 
 ---
 

@@ -24,25 +24,35 @@ wss://rpc.defistream.dev/eth         →  JSON-RPC WebSocket
 nginx/
 ├── docker-compose.yml
 ├── nginx.conf                          # main config (events, http block)
-├── conf.d/
-│   └── rpc.defistream.dev.conf         # vhost: TLS, path routing, backends
-└── certs/
-    ├── rpc.defistream.dev.crt          # add manually
-    └── rpc.defistream.dev.key          # add manually
+└── conf.d/
+    └── rpc.defistream.dev.conf         # vhost: TLS, path routing, backends
 ```
+
+TLS certificates are read from the host at:
+
+```
+/etc/letsencrypt/live/defistream.dev/fullchain.pem
+/etc/letsencrypt/live/defistream.dev/privkey.pem
+```
+
+The entire `/etc/letsencrypt` directory is mounted read-only into the container so that the symlinks in `live/` (which point into `archive/`) resolve correctly.
 
 ## Setup
 
-### 1. Add TLS certificate and key
+### 1. Ensure certificates exist
 
-Place the certificate and private key in `certs/`:
+The certificates must be present on the host before starting:
 
+```bash
+ls /etc/letsencrypt/live/defistream.dev/
+# fullchain.pem  privkey.pem  cert.pem  chain.pem  README
 ```
-nginx/certs/rpc.defistream.dev.crt
-nginx/certs/rpc.defistream.dev.key
-```
 
-The `certs/` directory is mounted read-only into the container.
+If using Certbot:
+
+```bash
+sudo certbot certonly --standalone -d rpc.defistream.dev
+```
 
 ### 2. Start
 
