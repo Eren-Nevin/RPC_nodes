@@ -4,25 +4,21 @@ services:
     image: ghcr.io/paradigmxyz/reth:v1.10.0
     container_name: eth-reth
     restart: unless-stopped
+    network_mode: host
     volumes:
       - /data/rpc_nodes/eth-data/reth:/root/.local/share/reth/mainnet
       - ./jwt.hex:/jwt.hex:ro
-    ports:
-      - "8555:8545"    # HTTP RPC
-      - "8556:8546"    # WebSocket
-      - "30303:30303"  # P2P TCP
-      - "30303:30303/udp"  # P2P UDP
     command:
       - node
       - --chain=mainnet
       - --http
       - --http.addr=0.0.0.0
-      - --http.port=8545
+      - --http.port=8555
       - --http.api=eth,net,web3,txpool
       - --http.corsdomain=*
       - --ws
       - --ws.addr=0.0.0.0
-      - --ws.port=8546
+      - --ws.port=8556
       - --ws.api=eth,net,web3
       - --ws.origins=*
       - --authrpc.addr=0.0.0.0
@@ -34,22 +30,21 @@ services:
     image: sigp/lighthouse:v8.0.1
     container_name: eth-lighthouse
     restart: unless-stopped
+    network_mode: host
     depends_on:
       - reth
     volumes:
       - /data/rpc_nodes/eth-data/lighthouse:/root/.lighthouse
       - ./jwt.hex:/jwt.hex:ro
-    ports:
-      - "9100:9000"      # P2P TCP
-      - "9100:9000/udp"  # P2P UDP
-      - "5052:5052"      # Beacon API
     command:
       - lighthouse
       - bn
       - --network=mainnet
-      - --execution-endpoint=http://reth:8551
+      - --execution-endpoint=http://127.0.0.1:8551
       - --execution-jwt=/jwt.hex
       - --checkpoint-sync-url=https://beaconstate.ethstaker.cc
       - --http
       - --http-address=0.0.0.0
       - --http-port=5052
+      - --port=9100
+      - --discovery-port=9100

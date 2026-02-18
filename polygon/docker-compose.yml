@@ -3,12 +3,9 @@ services:
     image: 0xpolygon/heimdall-v2:0.6.0
     container_name: polygon-heimdall
     restart: unless-stopped
+    network_mode: host
     volumes:
       - /data/rpc_nodes/polygon-data/heimdall:/heimdall-home
-    ports:
-      - "26656:26656"     # P2P
-      - "26657:26657"     # RPC
-      - "1317:1317"       # REST API (used by Bor)
     command:
       - start
       - --home=/heimdall-home
@@ -17,15 +14,11 @@ services:
     image: 0xpolygon/bor:2.5.7
     container_name: polygon-bor
     restart: unless-stopped
+    network_mode: host
     depends_on:
       - heimdall
     volumes:
       - /data/rpc_nodes/polygon-data/bor:/bor-home
-    ports:
-      - "8745:8545"       # HTTP RPC
-      - "8746:8546"       # WebSocket
-      - "30503:30303"     # P2P TCP
-      - "30503:30303/udp" # P2P UDP
     command:
       - server
       - --datadir=/bor-home
@@ -34,17 +27,18 @@ services:
       - --db.engine=pebble
       - --http
       - --http.addr=0.0.0.0
-      - --http.port=8545
+      - --http.port=8745
       - --http.api=eth,net,web3,txpool,bor
       - --http.corsdomain=*
       - --http.vhosts=*
       - --ws
       - --ws.addr=0.0.0.0
-      - --ws.port=8546
+      - --ws.port=8746
       - --ws.api=eth,net,web3
       - --ws.origins=*
-      - --bor.heimdall=http://172.17.0.1:1317
+      - --bor.heimdall=http://127.0.0.1:1317
       - --bootnodes=enode://48e6326841ce106f6b4e229a1be7e98a1d12be57e328b08cb461f6744ae4e78f5ec2340996ce9b40928a1a90137aadea13e25ca34774b52a3600d13a52c5c7bb@34.185.209.56:30303,enode://8ab6905fe76aa9001adb77135250e918db888cac216870c0e95cf26650d83d31d8c2c93d54c3333e0a2196517c41651d174b743ec3e11f44e595f62b77fec7ba@34.185.162.14:30303,enode://02e0b33cf60fb1f88f853c7c04830156151f4acd1c36173cd3fe1f375801fb4f5be5b3a89c98527915d37ed217752933c3faf4c820df740c9dd681294caebcf6@34.179.171.228:30303,enode://079c387b65b09674825462ea63c528ca996af7b03d19b1b2ab6557347434838067db6dd7ae5e0c2e08d5ba164117f3d7faffbf3e890cb91cffbdf45a433ddfce@35.246.166.189:30303
+      - --port=30503
       - --maxpeers=50
       - --cache=4096
       - --txlookuplimit=0

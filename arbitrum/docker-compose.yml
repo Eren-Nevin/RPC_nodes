@@ -3,11 +3,9 @@ services:
     image: offchainlabs/nitro-node:v3.9.4-7f582c3
     container_name: arbitrum-one
     restart: unless-stopped
+    network_mode: host
     volumes:
       - /data/rpc_nodes/arbitrum:/home/user/.arbitrum
-    ports:
-      - "8547:8547"    # HTTP RPC
-      - "8548:8548"    # WebSocket
     command:
       - --chain.id=42161
       - --parent-chain.connection.url=${L1_RPC_URL}
