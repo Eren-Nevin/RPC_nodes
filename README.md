@@ -239,7 +239,7 @@ Syncing from genesis takes weeks. Use the snapshot script instead:
 sudo ./download-snapshot -n eth
 ```
 
-This resolves the latest ethPandaOps Reth archive URL automatically, downloads with aria2c (16 connections), extracts to `/data/rpc_nodes/eth-data/`, and fixes ownership.
+This resolves the latest ethPandaOps Reth archive URL automatically, downloads with aria2c (16 connections), extracts to `/data/rpc_nodes/eth-data/reth/`, and fixes ownership.
 
 #### 3. Start
 
