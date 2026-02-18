@@ -72,15 +72,10 @@ All chain data lives under `/data/rpc_nodes/`:
 
 ```
 /data/rpc_nodes/
-├── eth-data/
-│   ├── reth/
-│   └── lighthouse/
-├── arbitrum/
-├── base-data/
-│   └── reth/snapshots/mainnet/download/
-├── polygon-data/
-│   ├── heimdall/data/
-│   └── bor/bor/chaindata/
+├── eth-data/        # populated by download-snapshot / Reth + Lighthouse
+├── arbitrum/        # populated by download-snapshot / Nitro
+├── base-data/       # populated by download-snapshot / op-reth
+├── polygon-data/    # populated by download-snapshot / Bor + Heimdall
 └── bsc-data/
 ```
 
@@ -242,7 +237,7 @@ Syncing from genesis takes weeks. Use the snapshot script instead:
 ./download-snapshot -n eth
 ```
 
-This resolves the latest ethPandaOps Reth archive URL automatically, downloads with aria2c (16 connections), extracts to `/data/rpc_nodes/eth-data/reth/`, and fixes ownership.
+This resolves the latest ethPandaOps Reth archive URL automatically, downloads with aria2c (16 connections), extracts to `/data/rpc_nodes/eth-data/`, and fixes ownership.
 
 #### 3. Start
 

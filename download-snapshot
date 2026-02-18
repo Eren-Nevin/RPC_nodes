@@ -113,7 +113,6 @@ do_eth() {
   fi
 
   local dest="${DATA_ROOT}/eth-data"
-  local extract_to="${DATA_ROOT}/eth-data/reth"
 
   if [[ "$EXTRACT_ONLY" == true ]]; then
     local found=()
@@ -124,9 +123,9 @@ do_eth() {
       exit 1
     fi
     for f in "${found[@]}"; do
-      extract_zst "$f" "$extract_to"
+      extract_zst "$f" "$dest"
     done
-    fix_ownership "$extract_to"
+    fix_ownership "$dest"
     return
   fi
 
@@ -140,8 +139,8 @@ do_eth() {
   download "$url" "$dest"
 
   echo "==> Extracting ..."
-  extract_zst "${dest}/snapshot.tar.zst" "$extract_to"
-  fix_ownership "$extract_to"
+  extract_zst "${dest}/snapshot.tar.zst" "$dest"
+  fix_ownership "$dest"
 }
 
 # ── ARB ───────────────────────────────────────────────────────────────────────
@@ -197,7 +196,6 @@ do_arb() {
 
 # ── BASE ──────────────────────────────────────────────────────────────────────
 do_base() {
-  local extract_to="${DATA_ROOT}/base-data/reth/snapshots/mainnet/download"
   local dest="${DATA_ROOT}/base-data"
 
   if [[ "$EXTRACT_ONLY" == true ]]; then
@@ -209,9 +207,9 @@ do_base() {
       exit 1
     fi
     for f in "${found[@]}"; do
-      extract_zst "$f" "$extract_to"
+      extract_zst "$f" "$dest"
     done
-    fix_ownership "$extract_to"
+    fix_ownership "$dest"
     return
   fi
 
@@ -237,8 +235,8 @@ do_base() {
   local filename
   filename="$(basename "$snapshot_url")"
   echo "==> Extracting ..."
-  extract_zst "${dest}/${filename}" "$extract_to"
-  fix_ownership "$extract_to"
+  extract_zst "${dest}/${filename}" "$dest"
+  fix_ownership "$dest"
 }
 
 # ── POLYGON ───────────────────────────────────────────────────────────────────
@@ -248,29 +246,20 @@ do_polygon() {
     exit 1
   fi
 
-  local heimdall_dest="${DATA_ROOT}/polygon-data/heimdall/data"
-  local bor_dest="${DATA_ROOT}/polygon-data/bor/bor/chaindata"
-  local dl_dir="${DATA_ROOT}/polygon-data"
+  local dest="${DATA_ROOT}/polygon-data"
 
   if [[ "$EXTRACT_ONLY" == true ]]; then
     local found=()
     while IFS= read -r -d '' f; do found+=("$f"); done \
-      < <(find "$dl_dir" -maxdepth 1 -name "*.tar.lz4" -print0 2>/dev/null)
+      < <(find "$dest" -maxdepth 1 -name "*.tar.lz4" -print0 2>/dev/null)
     if [[ ${#found[@]} -eq 0 ]]; then
-      echo "ERROR: No *.tar.lz4 files found in $dl_dir" >&2
+      echo "ERROR: No *.tar.lz4 files found in $dest" >&2
       exit 1
     fi
     for f in "${found[@]}"; do
-      local fname
-      fname="$(basename "$f")"
-      if [[ "$fname" == *heimdall* ]]; then
-        extract_lz4 "$f" "$heimdall_dest"
-      else
-        # bor-base and bor-part both go to chaindata
-        extract_lz4 "$f" "$bor_dest"
-      fi
+      extract_lz4 "$f" "$dest"
     done
-    fix_ownership "${DATA_ROOT}/polygon-data"
+    fix_ownership "$dest"
     return
   fi
 
@@ -321,22 +310,22 @@ do_polygon() {
   echo "    bor-base : $bor_base_url"
   echo "    bor-part : $bor_part_url"
 
-  mkdir -p "$heimdall_dest" "$bor_dest" "$dl_dir"
+  mkdir -p "$dest"
 
-  download "$heimdall_url" "$dl_dir"
-  download "$bor_base_url" "$dl_dir"
-  download "$bor_part_url" "$dl_dir"
+  download "$heimdall_url" "$dest"
+  download "$bor_base_url" "$dest"
+  download "$bor_part_url" "$dest"
 
   echo "==> Extracting Heimdall snapshot ..."
-  extract_lz4 "${dl_dir}/$(basename "$heimdall_url")" "$heimdall_dest"
+  extract_lz4 "${dest}/$(basename "$heimdall_url")" "$dest"
 
   echo "==> Extracting Bor base snapshot ..."
-  extract_lz4 "${dl_dir}/$(basename "$bor_base_url")" "$bor_dest"
+  extract_lz4 "${dest}/$(basename "$bor_base_url")" "$dest"
 
   echo "==> Extracting Bor incremental snapshot ..."
-  extract_lz4 "${dl_dir}/$(basename "$bor_part_url")" "$bor_dest"
+  extract_lz4 "${dest}/$(basename "$bor_part_url")" "$dest"
 
-  fix_ownership "${DATA_ROOT}/polygon-data"
+  fix_ownership "$dest"
 }
 
 # ─── dispatch ─────────────────────────────────────────────────────────────────

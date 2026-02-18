@@ -10,12 +10,10 @@ DATA_ROOT="${DATA_ROOT:-/data/rpc_nodes}"
 echo "Creating data directories under ${DATA_ROOT} ..."
 
 mkdir -p \
-  "${DATA_ROOT}/eth-data/reth" \
-  "${DATA_ROOT}/eth-data/lighthouse" \
+  "${DATA_ROOT}/eth-data" \
   "${DATA_ROOT}/arbitrum" \
-  "${DATA_ROOT}/base-data/reth/snapshots/mainnet/download" \
-  "${DATA_ROOT}/polygon-data/heimdall/data" \
-  "${DATA_ROOT}/polygon-data/bor/bor/chaindata" \
+  "${DATA_ROOT}/base-data" \
+  "${DATA_ROOT}/polygon-data" \
   "${DATA_ROOT}/bsc-data"
 
 chown -R 1000:1000 "${DATA_ROOT}"
