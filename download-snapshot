@@ -55,6 +55,13 @@ case "$TYPE" in
   *) echo "ERROR: Unknown type '${TYPE}'. Must be full or pruned." >&2; exit 1 ;;
 esac
 
+# ─── root check ──────────────────────────────────────────────────────────────
+if [[ $EUID -ne 0 ]]; then
+  echo "ERROR: This script must be run as root (writes to ${DATA_ROOT} and sets ownership)." >&2
+  echo "       Re-run with: sudo $0 $*" >&2
+  exit 1
+fi
+
 # ─── tool checks ─────────────────────────────────────────────────────────────
 check_tool() {
   if ! command -v "$1" &>/dev/null; then

@@ -182,6 +182,8 @@ Use the `download-snapshot` script to download and extract snapshots for any sup
 apt-get install aria2 zstd lz4
 ```
 
+> **Note:** The script writes to `/data/rpc_nodes/` and sets ownership, so it must be run with `sudo`.
+
 ### Per-chain snapshot support
 
 | Node | `full` | `pruned` | Source |
@@ -195,24 +197,24 @@ apt-get install aria2 zstd lz4
 
 ```bash
 # Ethereum — download and extract full archive
-./download-snapshot -n eth
+sudo ./download-snapshot -n eth
 
 # Arbitrum — pruned is the only option
-./download-snapshot -n arb -t pruned
+sudo ./download-snapshot -n arb -t pruned
 
 # Base — archive (full)
-./download-snapshot -n base -t full
+sudo ./download-snapshot -n base -t full
 
 # Base — pruned / full-node size
-./download-snapshot -n base -t pruned
+sudo ./download-snapshot -n base -t pruned
 
 # Polygon — downloads 3 lz4 files (heimdall + bor-base + bor-part)
-./download-snapshot -n polygon
+sudo ./download-snapshot -n polygon
 
 # Extract-only mode (files already downloaded, just extract)
-./download-snapshot -n eth -x
-./download-snapshot -n arb -t pruned -x
-./download-snapshot -n polygon -x
+sudo ./download-snapshot -n eth -x
+sudo ./download-snapshot -n arb -t pruned -x
+sudo ./download-snapshot -n polygon -x
 ```
 
 > **Tip:** Run inside `screen` or `tmux` — downloads can take many hours.
@@ -234,7 +236,7 @@ A pre-generated `eth/jwt.hex` is committed to the repo — no action needed. It 
 Syncing from genesis takes weeks. Use the snapshot script instead:
 
 ```bash
-./download-snapshot -n eth
+sudo ./download-snapshot -n eth
 ```
 
 This resolves the latest ethPandaOps Reth archive URL automatically, downloads with aria2c (16 connections), extracts to `/data/rpc_nodes/eth-data/`, and fixes ownership.
@@ -288,7 +290,7 @@ L1_RPC_URL=http://172.17.0.1:8555
 Arbitrum provides multi-part pruned snapshots only (archive discontinued May 2024). URLs are stored in `arbitrum/snapshot-urls.txt`.
 
 ```bash
-./download-snapshot -n arb -t pruned
+sudo ./download-snapshot -n arb -t pruned
 ```
 
 #### 3. Start
@@ -351,10 +353,10 @@ All other settings (JWT, network, P2P bootnodes, beacon URLs, etc.) are pre-conf
 
 ```bash
 # Archive (7-8 TB extracted)
-./download-snapshot -n base -t full
+sudo ./download-snapshot -n base -t full
 
 # Or pruned / full-node size
-./download-snapshot -n base -t pruned
+sudo ./download-snapshot -n base -t pruned
 ```
 
 #### 4. Start
@@ -409,7 +411,7 @@ bor_rpc_url = "http://172.17.0.1:8745"
 Polygon needs **two separate snapshots**: one for Heimdall (~1 TB) and one for Bor (~4.7 TB). Total: ~6 TB.
 
 ```bash
-./download-snapshot -n polygon
+sudo ./download-snapshot -n polygon
 ```
 
 This auto-discovers the latest PublicNode URLs (heimdall + bor-base + bor-part), downloads all three with aria2c (16 connections each), and extracts them to the correct directories. Falls back to `polygon/snapshot-urls.txt` if auto-discovery fails.
@@ -556,10 +558,10 @@ cp base/.env.example base/.env
 # Polygon: also edit /data/rpc_nodes/polygon-data/heimdall/config/app.toml after heimdall init
 
 # 4. Download snapshots (each takes many hours — run in screen/tmux)
-./download-snapshot -n eth
-./download-snapshot -n arb -t pruned
-./download-snapshot -n base -t full
-./download-snapshot -n polygon
+sudo ./download-snapshot -n eth
+sudo ./download-snapshot -n arb -t pruned
+sudo ./download-snapshot -n base -t full
+sudo ./download-snapshot -n polygon
 
 # 5. Start each chain node
 cd eth && docker compose up -d && cd ..
