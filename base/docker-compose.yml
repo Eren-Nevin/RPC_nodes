@@ -1,0 +1,33 @@
+services:
+  execution:
+    build:
+      context: ./base-node
+      dockerfile: reth/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8645:8545"       # HTTP RPC
+      - "8646:8546"       # WebSocket
+      - "7301:6060"       # metrics
+      - "30403:30303"     # P2P TCP
+      - "30403:30303/udp" # P2P UDP
+    command: ["bash", "./execution-entrypoint"]
+    volumes:
+      - /data/rpc_nodes/base-data/reth/snapshots/mainnet/download:/data
+    env_file:
+      - .env
+  node:
+    build:
+      context: ./base-node
+      dockerfile: reth/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - execution
+    ports:
+      - "7545:8545"       # RPC
+      - "9222:9222"       # P2P TCP
+      - "9222:9222/udp"   # P2P UDP
+      - "7300:7300"       # metrics
+      - "6060:6060"       # pprof
+    command: ["bash", "./op-node-entrypoint"]
+    env_file:
+      - .env
