@@ -5,7 +5,7 @@ services:
     container_name: eth-reth
     restart: unless-stopped
     volumes:
-      - /data/rpc_nodes/eth-data/reth:/root/.local/share/reth/mainnet
+      - /data/rpc_nodes/eth-data:/root/.local/share/reth/mainnet
       - ./jwt.hex:/jwt.hex:ro
     ports:
       - "8555:8545"    # HTTP RPC
