@@ -8,7 +8,7 @@ Self-hosted RPC node infrastructure for multiple blockchain networks. Each chain
 
 ```bash
 # 1. Clone with submodules
-git clone --recurse-submodules <repo-url>
+git clone --recurse-submodules https://github.com/Eren-Nevin/RPC_nodes.git
 cd RPC_nodes
 
 # 2. Create data directories and start nginx
@@ -95,6 +95,7 @@ Once running, nodes expose:
 | Ethereum | WebSocket | 8556 | `ws://localhost:8556` |
 | Ethereum | Beacon API | 5052 | `http://localhost:5052` |
 | Arbitrum | HTTP | 8547 | `http://localhost:8547` |
+| Arbitrum | WebSocket | 8548 | `ws://localhost:8548` |
 | Base | HTTP | 8645 | `http://localhost:8645` |
 | Base | WebSocket | 8646 | `ws://localhost:8646` |
 | Base | op-node | 7545 | `http://localhost:7545` |
@@ -411,7 +412,7 @@ curl -s http://localhost:7545 \
 
 ### Polygon PoS
 
-**Stack:** Bor v2.5.7 (execution) + Heimdall v2.0.0-beta4 (consensus)
+**Stack:** Bor v2.5.7 (execution) + Heimdall v0.6.0 (consensus)
 
 Polygon requires **two** services that must run together. Heimdall handles consensus (Tendermint-based) and Bor handles EVM execution.
 
@@ -519,6 +520,7 @@ sudo ufw allow 26656/tcp comment 'polygon heimdall p2p'
 sudo ufw deny 8555/tcp
 sudo ufw deny 8556/tcp
 sudo ufw deny 8547/tcp
+sudo ufw deny 8548/tcp
 sudo ufw deny 8645/tcp
 sudo ufw deny 8646/tcp
 sudo ufw deny 8745/tcp
@@ -559,7 +561,7 @@ For Base (submodule): `cd base/base-node && git fetch --tags && git checkout <ne
 | Base | op-geth | v1.101603.5 |
 | Base | Nethermind | 1.35.3 |
 | Polygon | Bor | v2.5.7 |
-| Polygon | Heimdall | v2.0.0-beta4 |
+| Polygon | Heimdall | v0.6.0 |
 
 ---
 
@@ -579,7 +581,7 @@ For Base (submodule): `cd base/base-node && git fetch --tags && git checkout <ne
 
 ```bash
 # 1. Clone with submodules
-git clone --recurse-submodules <repo-url>
+git clone --recurse-submodules https://github.com/Eren-Nevin/RPC_nodes.git
 cd RPC_nodes
 
 # 2. Create data directories and start nginx
