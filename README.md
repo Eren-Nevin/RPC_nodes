@@ -51,11 +51,19 @@ docker compose run --rm init
 ├── base/               # Base L2 (OP Stack, git submodule)
 ├── polygon/            # Polygon PoS (Bor + Heimdall)
 ├── bsc/                # BSC (snapshot tooling, WIP)
-├── nginx/              # Shared reverse proxy (rpc.defistream.dev)
-├── chains_self_host.md # Detailed hardware/software specs for 22+ chains
-├── RPC_ENDPOINTS.md    # Port mapping reference
-└── RPC_NODE.md         # Deployment template / version pinning
+├── nginx/              # Shared reverse proxy config (rpc.defistream.dev)
+└── chains_self_host.md # Hardware/storage reference for 22+ chains
 ```
+
+### Docker Compose locations
+
+| Chain | Compose file |
+|-------|-------------|
+| Nginx + init | `docker-compose.yml` |
+| Ethereum | `eth/docker-compose.yml` |
+| Arbitrum | `arbitrum/docker-compose.yml` |
+| Base | `base/base-node/docker-compose.yml` |
+| Polygon | `polygon/docker-compose.yml` |
 
 ### Data directory on disk
 
@@ -98,7 +106,7 @@ Once running, nodes expose:
 
 ## Reverse Proxy (public access)
 
-All chains are exposed publicly through a single nginx container at **`rpc.defistream.dev`** using path-based routing. The nginx service is part of the root `docker-compose.yml`. See [`nginx/`](nginx/) for the full config.
+All chains are exposed publicly through a single nginx container at **`rpc.defistream.dev`** using path-based routing. The nginx service is part of the root `docker-compose.yml`.
 
 | Public URL | Chain | Protocol |
 |-----------|-------|----------|
@@ -113,7 +121,46 @@ All chains are exposed publicly through a single nginx container at **`rpc.defis
 
 HTTP and WebSocket share the same URL — nginx detects `Upgrade: websocket` and routes to the correct backend port automatically.
 
-Certificates are read from `/etc/letsencrypt/live/defistream.dev/` on the host (mounted read-only). The nginx container uses `network_mode: host` and reaches all node ports on `127.0.0.1` directly.
+The entire `/etc/letsencrypt` directory is mounted read-only so that symlinks in `live/` (pointing into `archive/`) resolve correctly. The container uses `network_mode: host` and reaches all node ports on `127.0.0.1` directly.
+
+### Certificate setup
+
+```bash
+# First-time certificate issuance (run before starting nginx)
+sudo certbot certonly --standalone -d rpc.defistream.dev
+
+# Verify certs exist
+ls /etc/letsencrypt/live/defistream.dev/
+# fullchain.pem  privkey.pem  cert.pem  chain.pem
+```
+
+### nginx config files
+
+```
+nginx/
+├── nginx.conf                          # events/http block
+└── conf.d/
+    └── rpc.defistream.dev.conf         # TLS, path routing, backends
+```
+
+### nginx operations
+
+```bash
+# Test config before reloading
+docker compose exec nginx nginx -t
+
+# Graceful reload (no downtime)
+docker compose exec nginx nginx -s reload
+
+# Tail logs
+docker compose logs -f nginx
+```
+
+### Adding a new chain
+
+1. Bind the node to a new host port (e.g. `8847` HTTP, `8848` WS).
+2. Add a `location` block in `nginx/conf.d/rpc.defistream.dev.conf` routing `/chainname` to the new backend.
+3. Run `docker compose exec nginx nginx -s reload`.
 
 ---
 
@@ -450,16 +497,31 @@ Each chain uses unique ports to avoid conflicts. See the [RPC Endpoints](#rpc-en
 
 ### Firewall
 
-Open P2P ports for peering. Without these, your node won't find peers and syncing will be slow or stall:
+```bash
+# HTTPS and HTTP redirect — open to everyone
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
 
-| Chain | P2P Ports |
-|-------|-----------|
-| Ethereum | 30303/tcp+udp, 9100/tcp+udp |
-| Arbitrum | (no P2P needed for Nitro full node) |
-| Base | 30403/tcp+udp, 9222/tcp+udp |
-| Polygon | 30503/tcp+udp, 26656/tcp |
+# P2P ports — open to everyone (required for node peering)
+sudo ufw allow 30303/tcp comment 'eth p2p'
+sudo ufw allow 30303/udp comment 'eth p2p'
+sudo ufw allow 9100/tcp  comment 'lighthouse p2p'
+sudo ufw allow 9100/udp  comment 'lighthouse p2p'
+sudo ufw allow 30403/tcp comment 'base p2p'
+sudo ufw allow 30403/udp comment 'base p2p'
+sudo ufw allow 30503/tcp comment 'polygon bor p2p'
+sudo ufw allow 30503/udp comment 'polygon bor p2p'
+sudo ufw allow 26656/tcp comment 'polygon heimdall p2p'
 
-Keep RPC ports (8545, 8547, etc.) **closed** to the public internet unless behind authentication or a reverse proxy.
+# Raw RPC ports — block direct external access (nginx proxies these)
+sudo ufw deny 8555/tcp
+sudo ufw deny 8556/tcp
+sudo ufw deny 8547/tcp
+sudo ufw deny 8645/tcp
+sudo ufw deny 8646/tcp
+sudo ufw deny 8745/tcp
+sudo ufw deny 8746/tcp
+```
 
 ### Monitoring sync progress
 
