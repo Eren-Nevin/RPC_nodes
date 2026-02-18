@@ -1,5 +1,6 @@
 # Secrets and credentials
 *.hex
+!eth/jwt.hex
 .env
 private_nodes.env
 

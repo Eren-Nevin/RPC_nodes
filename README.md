@@ -230,13 +230,9 @@ apt-get install aria2 zstd lz4
 
 **Stack:** Reth v1.10.0 (execution) + Lighthouse v8.0.1 (consensus)
 
-#### 1. Generate or use the JWT secret
+#### 1. JWT secret
 
-A `jwt.hex` file is required for authenticated communication between Reth and Lighthouse. One is already provided in `eth/`. To generate a new one:
-
-```bash
-openssl rand -hex 32 > eth/jwt.hex
-```
+A pre-generated `eth/jwt.hex` is committed to the repo — no action needed. It is used only for local engine API communication between Reth and Lighthouse inside Docker.
 
 #### 2. Download a snapshot (recommended)
 
@@ -281,14 +277,16 @@ curl -s http://localhost:5052/eth/v1/node/syncing
 
 #### 1. Configure L1 endpoints
 
-Copy or edit `arbitrum/.env`:
-
-```env
-L1_RPC_URL=https://mainnet.infura.io/v3/<YOUR_KEY>
-L1_BEACON_URL=https://ethereum-beacon-api.publicnode.com
+```bash
+cp arbitrum/.env.example arbitrum/.env
+# then edit L1_RPC_URL if not using the local eth node
 ```
 
-You can also point `L1_RPC_URL` at your local Ethereum node (`http://<host>:8555`) once it is synced.
+`arbitrum/.env` has a single variable — the Beacon URL defaults to PublicNode:
+
+```env
+L1_RPC_URL=http://172.17.0.1:8555
+```
 
 #### 2. Download a snapshot
 
@@ -327,7 +325,7 @@ bash arbitrum/check-sync.sh
 
 ### Base (OP Stack L2)
 
-**Stack:** Reth (recommended), Geth, or Nethermind + op-node
+**Stack:** Reth + op-node
 
 Base uses the official [base/node](https://github.com/base/node) repository as a **git submodule** under `base/base-node/`.
 
@@ -387,8 +385,7 @@ curl -s http://localhost:7545 \
 
 #### Gotchas
 
-- **Use Reth, not Geth** for archive nodes. Geth archive for Base grows to ~46 TB and is impractical.
-- The Base node runs **two containers**: an execution client and `op-node` (OP Stack consensus). Both must be running.
+- The Base node runs **two containers**: an execution client (Reth) and `op-node` (OP Stack consensus). Both must be running.
 - The JWT (`OP_NODE_L2_ENGINE_AUTH_RAW`) is pre-set in `docker-compose.yml` and shared automatically between the execution client and op-node — no manual generation needed.
 - Sync mode is `execution-layer` — the node syncs execution data and derives consensus from L1.
 - The submodule pins a specific version. To update: `cd base/base-node && git fetch && git checkout <tag>`.
@@ -404,10 +401,12 @@ Polygon requires **two** services that must run together. Heimdall handles conse
 
 #### 1. Configure L1 endpoint
 
-Edit `polygon/.env`:
+Heimdall reads its L1 RPC URL from `config/app.toml` inside the heimdall home directory (set during init). Edit after running `heimdall init`:
 
-```env
-ETH_RPC_URL=https://mainnet.infura.io/v3/<YOUR_KEY>
+```toml
+# /data/rpc_nodes/polygon-data/heimdall/config/app.toml
+eth_rpc_url = "http://172.17.0.1:8555"
+bor_rpc_url = "http://172.17.0.1:8745"
 ```
 
 #### 2. Download snapshots
@@ -555,10 +554,11 @@ cd RPC_nodes
 # 2. Create data directories and start nginx
 docker compose up -d
 
-# 3. Set up .env files with your L1 endpoints
-#    - arbitrum/.env
-#    - polygon/.env
-#    - base/base-node/.env.custom (or .env.mainnet)
+# 3. Set up .env files (only L1 RPC URL needed for each)
+cp arbitrum/.env.example arbitrum/.env
+cp base/.env.example base/.env
+# Edit L1_RPC_URL / OP_NODE_L1_ETH_RPC in each file
+# Polygon: also edit /data/rpc_nodes/polygon-data/heimdall/config/app.toml after heimdall init
 
 # 4. Download snapshots (each takes many hours — run in screen/tmux)
 ./download-snapshot -n eth

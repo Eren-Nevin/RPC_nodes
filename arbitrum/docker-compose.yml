@@ -11,7 +11,7 @@ services:
     command:
       - --chain.id=42161
       - --parent-chain.connection.url=${L1_RPC_URL}
-      - --parent-chain.blob-client.beacon-url=${L1_BEACON_URL}
+      - --parent-chain.blob-client.beacon-url=${L1_BEACON_URL:-https://ethereum-beacon-api.publicnode.com}
       - --node.staker.enable=false
       - --http.api=net,web3,eth,debug
       - --http.addr=0.0.0.0
