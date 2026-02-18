@@ -507,7 +507,7 @@ Run `open-ports.sh` once on the host to configure UFW:
 sudo ./open-ports.sh
 ```
 
-This opens ports 80/443 (nginx) and all P2P peering ports, and explicitly blocks the raw RPC ports from external access. RPC ports are intentionally not exposed publicly — external traffic reaches them only via nginx `proxy_pass` on `127.0.0.1`.
+This opens ports 80/443 (nginx) and all P2P peering ports. RPC ports are not exposed publicly — external traffic reaches them only via nginx `proxy_pass` on `127.0.0.1`.
 
 ### Monitoring sync progress
 

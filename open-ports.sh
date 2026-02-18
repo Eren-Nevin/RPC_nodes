@@ -2,8 +2,7 @@
 # open-ports.sh — configure UFW firewall rules for RPC node infrastructure.
 # Run once on the host after installing UFW.
 #
-# Opens:  443/tcp, 80/tcp (nginx public), P2P ports for each chain
-# Blocks: raw RPC ports (external access goes through nginx only)
+# Opens: 443/tcp, 80/tcp (nginx public), P2P ports for each chain
 
 set -e
 
@@ -28,15 +27,6 @@ ufw allow 30503/tcp comment 'polygon bor p2p'
 ufw allow 30503/udp comment 'polygon bor p2p'
 ufw allow 26656/tcp comment 'polygon heimdall p2p'
 
-# Block raw RPC ports from external access (nginx proxies these internally)
-ufw deny 8555/tcp  comment 'eth rpc - internal only'
-ufw deny 8556/tcp  comment 'eth ws  - internal only'
-ufw deny 8547/tcp  comment 'arb rpc - internal only'
-ufw deny 8548/tcp  comment 'arb ws  - internal only'
-ufw deny 8645/tcp  comment 'base rpc - internal only'
-ufw deny 8646/tcp  comment 'base ws  - internal only'
-ufw deny 8745/tcp  comment 'polygon rpc - internal only'
-ufw deny 8746/tcp  comment 'polygon ws  - internal only'
 
 echo "=== Current UFW status ==="
 ufw status verbose
