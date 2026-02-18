@@ -153,8 +153,8 @@ do_eth() {
 
 # ── ARB ───────────────────────────────────────────────────────────────────────
 do_arb() {
-  if [[ "$TYPE" == "full" ]]; then
-    echo "ERROR: arb only supports 'pruned' snapshots (archive discontinued May 2024)." >&2
+  if [[ "$TYPE" == "pruned" ]]; then
+    echo "ERROR: arb only supports 'full' snapshots (PublicNode provides full archive)." >&2
     exit 1
   fi
 

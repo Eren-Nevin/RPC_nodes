@@ -33,7 +33,7 @@ docker compose run --rm init
 | Chain | Clients | Type | Storage | Monthly Growth | RPC Port |
 |-------|---------|------|---------|----------------|----------|
 | Ethereum L1 | Reth + Lighthouse | Full/Archive | ~2.4 TB | ~15 GB | 8555 |
-| Arbitrum One | Nitro | Pruned | ~2-3 TB | ~200 GB | 8547 |
+| Arbitrum One | Nitro | Full | ~2.8 TB | ~200 GB | 8547 |
 | Base (OP Stack) | Reth / Geth / Nethermind + op-node | Archive | ~7-8 TB | 50-100 GB/week | 8645 |
 | Polygon PoS | Bor + Heimdall | Full | ~6 TB | ~3 TB | 8745 |
 
@@ -189,7 +189,7 @@ apt-get install aria2 zstd lz4
 | Node | `full` | `pruned` | Source |
 |------|--------|----------|--------|
 | eth | ✅ ~2.4 TB | ❌ | ethPandaOps (auto-resolved) |
-| arb | ❌ | ✅ ~2-3 TB | PublicNode (base + part lz4, auto-discovered) |
+| arb | ✅ ~2.8 TB | ❌ | PublicNode (base + part lz4, auto-discovered) |
 | base | ✅ ~7-8 TB | ✅ ~4-5 TB | base.org (auto-resolved) |
 | polygon | ✅ ~6 TB | ❌ | PublicNode (3 × lz4, auto-discovered) |
 
@@ -199,8 +199,8 @@ apt-get install aria2 zstd lz4
 # Ethereum — download and extract full archive
 sudo ./download-snapshot -n eth
 
-# Arbitrum — pruned is the only option
-sudo ./download-snapshot -n arb -t pruned
+# Arbitrum — full is the only option
+sudo ./download-snapshot -n arb
 
 # Base — archive (full)
 sudo ./download-snapshot -n base -t full
@@ -213,7 +213,7 @@ sudo ./download-snapshot -n polygon
 
 # Extract-only mode (files already downloaded, just extract)
 sudo ./download-snapshot -n eth -x
-sudo ./download-snapshot -n arb -t pruned -x
+sudo ./download-snapshot -n arb -x
 sudo ./download-snapshot -n polygon -x
 ```
 
@@ -287,10 +287,10 @@ L1_RPC_URL=http://172.17.0.1:8555
 
 #### 2. Download a snapshot
 
-Arbitrum pruned snapshots are sourced from PublicNode (lz4 format, archive discontinued May 2024). The script auto-discovers current URLs from `publicnode.com/snapshots` and falls back to `arbitrum/snapshot-urls.txt`.
+Arbitrum full snapshots are sourced from PublicNode (lz4 format). The script auto-discovers current URLs from `publicnode.com/snapshots` and falls back to `arbitrum/snapshot-urls.txt`.
 
 ```bash
-sudo ./download-snapshot -n arb -t pruned
+sudo ./download-snapshot -n arb
 ```
 
 #### 3. Start
@@ -559,7 +559,7 @@ cp base/.env.example base/.env
 
 # 4. Download snapshots (each takes many hours — run in screen/tmux)
 sudo ./download-snapshot -n eth
-sudo ./download-snapshot -n arb -t pruned
+sudo ./download-snapshot -n arb
 sudo ./download-snapshot -n base -t full
 sudo ./download-snapshot -n polygon
 
