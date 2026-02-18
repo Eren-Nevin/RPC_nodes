@@ -221,27 +221,28 @@ do_base() {
     return
   fi
 
-  local api_url
+  local api_url base_url
   case "$TYPE" in
     full)
-      api_url="https://mainnet-reth-archive-snapshots.base.org/latest"
+      base_url="https://mainnet-reth-archive-snapshots.base.org"
+      api_url="${base_url}/latest"
       echo "==> Resolving latest Base archive (full) snapshot ..."
       ;;
     pruned)
-      api_url="https://mainnet-reth-full-snapshots.base.org/latest"
+      base_url="https://mainnet-reth-full-snapshots.base.org"
+      api_url="${base_url}/latest"
       echo "==> Resolving latest Base full (pruned) snapshot ..."
       ;;
   esac
 
-  local snapshot_url
-  snapshot_url="$(curl -sSfL "$api_url")"
+  local filename snapshot_url
+  filename="$(curl -sSfL "$api_url")"
+  snapshot_url="${base_url}/${filename}"
   echo "==> Resolved: $snapshot_url"
 
   mkdir -p "$dest"
   download "$snapshot_url" "$dest"
 
-  local filename
-  filename="$(basename "$snapshot_url")"
   echo "==> Extracting ..."
   extract_zst "${dest}/${filename}" "$dest"
   fix_ownership "$dest"
