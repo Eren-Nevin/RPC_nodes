@@ -44,6 +44,7 @@ docker compose run --rm init
 ```
 .
 ├── init-data-dirs.sh   # Creates /data/rpc_nodes/** (called by docker-compose init service)
+├── open-ports.sh       # Configures UFW firewall rules (run once on host)
 ├── docker-compose.yml  # Root compose: init + nginx services
 ├── download-snapshot   # Snapshot download/extract script (see below)
 ├── eth/                # Ethereum L1 (Reth + Lighthouse)
@@ -500,32 +501,13 @@ Each chain uses unique ports to avoid conflicts. See the [RPC Endpoints](#rpc-en
 
 ### Firewall
 
+Run `open-ports.sh` once on the host to configure UFW:
+
 ```bash
-# HTTPS and HTTP redirect — open to everyone
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-
-# P2P ports — open to everyone (required for node peering)
-sudo ufw allow 30303/tcp comment 'eth p2p'
-sudo ufw allow 30303/udp comment 'eth p2p'
-sudo ufw allow 9100/tcp  comment 'lighthouse p2p'
-sudo ufw allow 9100/udp  comment 'lighthouse p2p'
-sudo ufw allow 30403/tcp comment 'base p2p'
-sudo ufw allow 30403/udp comment 'base p2p'
-sudo ufw allow 30503/tcp comment 'polygon bor p2p'
-sudo ufw allow 30503/udp comment 'polygon bor p2p'
-sudo ufw allow 26656/tcp comment 'polygon heimdall p2p'
-
-# Raw RPC ports — block direct external access (nginx proxies these)
-sudo ufw deny 8555/tcp
-sudo ufw deny 8556/tcp
-sudo ufw deny 8547/tcp
-sudo ufw deny 8548/tcp
-sudo ufw deny 8645/tcp
-sudo ufw deny 8646/tcp
-sudo ufw deny 8745/tcp
-sudo ufw deny 8746/tcp
+sudo ./open-ports.sh
 ```
+
+This opens ports 80/443 (nginx) and all P2P peering ports, and explicitly blocks the raw RPC ports from external access. RPC ports are intentionally not exposed publicly — external traffic reaches them only via nginx `proxy_pass` on `127.0.0.1`.
 
 ### Monitoring sync progress
 
@@ -571,6 +553,7 @@ For Base (submodule): `cd base/base-node && git fetch --tags && git checkout <ne
 |--------|----------|---------|
 | `download-snapshot` | root | Download and extract snapshots for any chain |
 | `init-data-dirs.sh` | root | Create `/data/rpc_nodes/**` with correct ownership |
+| `open-ports.sh` | root | Configure UFW firewall rules (run once on host) |
 | `start-after-extract.sh` | `eth/` | Monitors snapshot extraction, fixes ownership, auto-starts Ethereum node |
 | `check-sync.sh` | `arbitrum/` | Polls sync status every 60s with desktop notification on completion |
 | `fetch-snapshot.sh` | `bsc/` | Downloads, verifies, and extracts BSC snapshots (aria2c + lz4) |
