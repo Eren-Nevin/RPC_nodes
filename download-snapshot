@@ -219,11 +219,23 @@ do_arb() {
   download "$base_url" "$dest"
   download "$part_url" "$dest"
 
+  # Resolve actual filenames on disk (PublicNode may rotate URLs mid-download)
+  local base_file part_file
+  base_file="$(ls -t "${dest}"/arbitrum-base-*.tar.lz4 2>/dev/null | head -1)"
+  part_file="$(ls -t "${dest}"/arbitrum-part-*.tar.lz4 2>/dev/null | head -1)"
+
+  if [[ -z "$base_file" || -z "$part_file" ]]; then
+    echo "ERROR: Could not find all downloaded snapshot files in $dest" >&2
+    echo "  base : ${base_file:-<not found>}" >&2
+    echo "  part : ${part_file:-<not found>}" >&2
+    exit 1
+  fi
+
   echo "==> Extracting base snapshot ..."
-  extract_lz4 "${dest}/$(basename "$base_url")" "$dest"
+  extract_lz4 "$base_file" "$dest"
 
   echo "==> Extracting incremental snapshot ..."
-  extract_lz4 "${dest}/$(basename "$part_url")" "$dest"
+  extract_lz4 "$part_file" "$dest"
 
   fix_ownership "$dest"
 }
@@ -285,16 +297,22 @@ do_polygon() {
   local dest="${DATA_ROOT}/polygon-data"
 
   if [[ "$EXTRACT_ONLY" == true ]]; then
-    local found=()
-    while IFS= read -r -d '' f; do found+=("$f"); done \
-      < <(find "$dest" -maxdepth 1 -name "*.tar.lz4" -print0 2>/dev/null)
-    if [[ ${#found[@]} -eq 0 ]]; then
-      echo "ERROR: No *.tar.lz4 files found in $dest" >&2
+    local heimdall_file bor_base_file bor_part_file
+    heimdall_file="$(ls -t "${dest}"/polygon-heimdall-*.tar.lz4 2>/dev/null | head -1)"
+    bor_base_file="$(ls -t "${dest}"/polygon-bor-base-*.tar.lz4 2>/dev/null | head -1)"
+    bor_part_file="$(ls -t "${dest}"/polygon-bor-part-*.tar.lz4 2>/dev/null | head -1)"
+
+    if [[ -z "$heimdall_file" || -z "$bor_base_file" || -z "$bor_part_file" ]]; then
+      echo "ERROR: Could not find all snapshot files in $dest" >&2
+      echo "  heimdall : ${heimdall_file:-<not found>}" >&2
+      echo "  bor-base : ${bor_base_file:-<not found>}" >&2
+      echo "  bor-part : ${bor_part_file:-<not found>}" >&2
       exit 1
     fi
-    for f in "${found[@]}"; do
-      extract_lz4 "$f" "$dest"
-    done
+
+    extract_lz4 "$heimdall_file" "${dest}/heimdall"
+    extract_lz4 "$bor_base_file" "$dest"
+    extract_lz4 "$bor_part_file" "$dest"
     fix_ownership "$dest"
     return
   fi
@@ -352,14 +370,28 @@ do_polygon() {
   download "$bor_base_url" "$dest"
   download "$bor_part_url" "$dest"
 
+  # Resolve actual filenames on disk (PublicNode may rotate URLs mid-download)
+  local heimdall_file bor_base_file bor_part_file
+  heimdall_file="$(ls -t "${dest}"/polygon-heimdall-*.tar.lz4 2>/dev/null | head -1)"
+  bor_base_file="$(ls -t "${dest}"/polygon-bor-base-*.tar.lz4 2>/dev/null | head -1)"
+  bor_part_file="$(ls -t "${dest}"/polygon-bor-part-*.tar.lz4 2>/dev/null | head -1)"
+
+  if [[ -z "$heimdall_file" || -z "$bor_base_file" || -z "$bor_part_file" ]]; then
+    echo "ERROR: Could not find all downloaded snapshot files in $dest" >&2
+    echo "  heimdall : ${heimdall_file:-<not found>}" >&2
+    echo "  bor-base : ${bor_base_file:-<not found>}" >&2
+    echo "  bor-part : ${bor_part_file:-<not found>}" >&2
+    exit 1
+  fi
+
   echo "==> Extracting Heimdall snapshot ..."
-  extract_lz4 "${dest}/$(basename "$heimdall_url")" "$dest"
+  extract_lz4 "$heimdall_file" "${dest}/heimdall"
 
   echo "==> Extracting Bor base snapshot ..."
-  extract_lz4 "${dest}/$(basename "$bor_base_url")" "$dest"
+  extract_lz4 "$bor_base_file" "$dest"
 
   echo "==> Extracting Bor incremental snapshot ..."
-  extract_lz4 "${dest}/$(basename "$bor_part_url")" "$dest"
+  extract_lz4 "$bor_part_file" "$dest"
 
   fix_ownership "$dest"
 }

@@ -22,7 +22,7 @@ services:
       - --ws.api=eth,net,web3
       - --ws.origins=*
       - --authrpc.addr=0.0.0.0
-      - --authrpc.port=8551
+      - --authrpc.port=8552
       - --authrpc.jwtsecret=/jwt.hex
 
   # Consensus Layer (Lighthouse)
@@ -40,7 +40,7 @@ services:
       - lighthouse
       - bn
       - --network=mainnet
-      - --execution-endpoint=http://127.0.0.1:8551
+      - --execution-endpoint=http://127.0.0.1:8552
       - --execution-jwt=/jwt.hex
       - --checkpoint-sync-url=https://beaconstate.ethstaker.cc
       - --http
