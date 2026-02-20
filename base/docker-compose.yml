@@ -32,14 +32,14 @@ services:
     environment:
       # --- L1 endpoint: set OP_NODE_L1_ETH_RPC in .env ---
       OP_NODE_L1_ETH_RPC: ${OP_NODE_L1_ETH_RPC}
-      OP_NODE_L1_BEACON: https://ethereum-beacon-api.publicnode.com
+      OP_NODE_L1_BEACON: http://127.0.0.1:5052
       OP_NODE_L1_BEACON_ARCHIVER: https://ethereum-beacon-api.publicnode.com
       OP_NODE_L1_BEACON_FETCH_ALL_SIDECARS: "true"
-      OP_NODE_L1_RPC_KIND: standard
-      OP_NODE_L1_TRUST_RPC: "false"
+      OP_NODE_L1_RPC_KIND: basic
+      OP_NODE_L1_TRUST_RPC: "true"
       # --- Network ---
       OP_NODE_NETWORK: base-mainnet
-      OP_NODE_SYNCMODE: execution-layer
+      OP_NODE_SYNCMODE: consensus-layer
       OP_NODE_VERIFIER_L1_CONFS: "4"
       OP_NODE_ROLLUP_LOAD_PROTOCOL_VERSIONS: "true"
       # --- Engine API (shared JWT with execution) ---

@@ -384,7 +384,10 @@ curl -s http://localhost:7545 \
 
 - The Base node runs **two containers**: an execution client (Reth) and `op-node` (OP Stack consensus). Both must be running.
 - The JWT (`OP_NODE_L2_ENGINE_AUTH_RAW`) is pre-set in `docker-compose.yml` and shared automatically between the execution client and op-node — no manual generation needed.
-- Sync mode is `execution-layer` — the node syncs execution data and derives consensus from L1.
+- Sync mode is `consensus-layer` — op-node derives safe/finalized heads from L1 and gets unsafe blocks via P2P. This avoids EL sync state machine issues with Reth snapshots.
+- `OP_NODE_L1_RPC_KIND` is set to `basic` since the local L1 is Reth (not Geth). Use `debug_geth` for Geth, `alchemy`/`infura` for hosted providers.
+- **Beacon archiver**: Post-Ecotone, Base derivation requires L1 blob data. Local Lighthouse prunes blobs after ~18 days. `OP_NODE_L1_BEACON_ARCHIVER` must point to a public endpoint (e.g. `https://ethereum-beacon-api.publicnode.com`) for historical blob retrieval, while `OP_NODE_L1_BEACON` can remain on the local beacon node for recent data.
+- **Restart both containers together** when changing L1 RPC or sync settings — Reth's engine state must reset alongside op-node. Use `docker compose up -d --force-recreate` (not `restart`) to pick up env var changes.
 - The submodule pins a specific version. To update: `cd base/base-node && git fetch && git checkout <tag>`.
 - Growth is 50-100 GB/week; monitor disk usage.
 
