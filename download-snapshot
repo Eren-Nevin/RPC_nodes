@@ -5,7 +5,7 @@
 #   ./download-snapshot -n <node> [-t full|pruned] [-x] [-d <data-root>]
 #
 # Options:
-#   -n  Node name (required): eth | arb | base | polygon
+#   -n  Node name (required): eth | arb | base | polygon | bsc
 #   -t  Snapshot type: full (default) | pruned
 #   -x  Extract-only mode: scan data dir for already-downloaded files and extract them
 #   -d  Override data root (default: /data/rpc_nodes)
@@ -41,13 +41,13 @@ done
 
 # ─── validate args ────────────────────────────────────────────────────────────
 if [[ -z "$NODE" ]]; then
-  echo "ERROR: -n <node> is required (eth | arb | base | polygon)" >&2
+  echo "ERROR: -n <node> is required (eth | arb | base | polygon | bsc)" >&2
   usage 1
 fi
 
 case "$NODE" in
-  eth|arb|base|polygon) ;;
-  *) echo "ERROR: Unknown node '${NODE}'. Must be one of: eth arb base polygon" >&2; exit 1 ;;
+  eth|arb|base|polygon|bsc) ;;
+  *) echo "ERROR: Unknown node '${NODE}'. Must be one of: eth arb base polygon bsc" >&2; exit 1 ;;
 esac
 
 case "$TYPE" in
@@ -93,7 +93,7 @@ extract_zst() {
   local dest="$2"
   echo "==> Extracting (zstd): $file → $dest"
   mkdir -p "$dest"
-  zstd -d --stdout "$file" | tar -xf - -C "$dest"
+  zstd -d --long=31 --stdout "$file" | tar -xf - -C "$dest"
 }
 
 extract_lz4() {
@@ -311,8 +311,8 @@ do_polygon() {
     fi
 
     extract_lz4 "$heimdall_file" "${dest}/heimdall"
-    extract_lz4 "$bor_base_file" "$dest"
-    extract_lz4 "$bor_part_file" "$dest"
+    extract_lz4 "$bor_base_file" "${dest}/bor"
+    extract_lz4 "$bor_part_file" "${dest}/bor"
     fix_ownership "$dest"
     return
   fi
@@ -388,12 +388,71 @@ do_polygon() {
   extract_lz4 "$heimdall_file" "${dest}/heimdall"
 
   echo "==> Extracting Bor base snapshot ..."
-  extract_lz4 "$bor_base_file" "$dest"
+  extract_lz4 "$bor_base_file" "${dest}/bor"
 
   echo "==> Extracting Bor incremental snapshot ..."
-  extract_lz4 "$bor_part_file" "$dest"
+  extract_lz4 "$bor_part_file" "${dest}/bor"
 
   fix_ownership "$dest"
+}
+
+# ── BSC ────────────────────────────────────────────────────────────────────────
+do_bsc() {
+  if [[ "$TYPE" == "pruned" ]]; then
+    echo "ERROR: bsc only supports 'full' snapshots (bnb-chain/reth MDBX)." >&2
+    exit 1
+  fi
+
+  local dest="${DATA_ROOT}/bsc-data"
+  local extract_to="${DATA_ROOT}/bsc-data/reth"
+
+  if [[ "$EXTRACT_ONLY" == true ]]; then
+    local found=()
+    while IFS= read -r -d '' f; do found+=("$f"); done \
+      < <(find "$dest" -maxdepth 1 -name "*reth*full*.tar.zst" -print0 2>/dev/null)
+    if [[ ${#found[@]} -eq 0 ]]; then
+      echo "ERROR: No BSC Reth *.tar.zst files found in $dest" >&2
+      exit 1
+    fi
+    for f in "${found[@]}"; do
+      extract_zst "$f" "$extract_to"
+    done
+    fix_ownership "$extract_to"
+    return
+  fi
+
+  # Resolve snapshot URL from bsc/snapshot-urls.txt
+  local urls_file="${SCRIPT_DIR}/bsc/snapshot-urls.txt"
+  local url=""
+
+  if [[ -f "$urls_file" ]]; then
+    url="$(grep -oE 'https://pub-[a-z0-9]+\.r2\.dev/[0-9]+_mainnet_reth_mdbx_full_node\.tar\.zst' "$urls_file" | head -1 || true)"
+  fi
+
+  if [[ -z "$url" ]]; then
+    echo "ERROR: Could not resolve BSC Reth snapshot URL." >&2
+    echo "Update bsc/snapshot-urls.txt with the latest URL from:" >&2
+    echo "  https://github.com/bnb-chain/bsc-snapshots" >&2
+    exit 1
+  fi
+
+  echo "==> Using BSC Reth full node snapshot: $url"
+
+  mkdir -p "$extract_to"
+  download "$url" "$dest"
+
+  # Resolve actual filename on disk
+  local snapshot_file
+  snapshot_file="$(ls -t "${dest}"/*reth*full*.tar.zst 2>/dev/null | head -1)"
+
+  if [[ -z "$snapshot_file" ]]; then
+    echo "ERROR: Could not find downloaded snapshot file in $dest" >&2
+    exit 1
+  fi
+
+  echo "==> Extracting ..."
+  extract_zst "$snapshot_file" "$extract_to"
+  fix_ownership "$extract_to"
 }
 
 # ─── dispatch ─────────────────────────────────────────────────────────────────
@@ -404,6 +463,7 @@ case "$NODE" in
   arb)     do_arb ;;
   base)    do_base ;;
   polygon) do_polygon ;;
+  bsc)     do_bsc ;;
 esac
 
 echo "=== Done ==="

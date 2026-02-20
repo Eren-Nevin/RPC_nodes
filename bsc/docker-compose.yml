@@ -1,0 +1,25 @@
+services:
+  reth:
+    image: ghcr.io/bnb-chain/reth:nightly
+    container_name: bsc-reth
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /data/rpc_nodes/bsc-data/reth:/data
+    command:
+      - node
+      - --full
+      - --chain=bsc
+      - --datadir=/data
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=8845
+      - --http.api=eth,net,web3,txpool,debug
+      - --http.corsdomain=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=8846
+      - --ws.api=eth,net,web3,txpool
+      - --ws.origins=*
+      - --port=30603
+      - --discovery.port=30603
