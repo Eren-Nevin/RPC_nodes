@@ -1,11 +1,11 @@
 services:
   reth:
-    image: ghcr.io/bnb-chain/reth:nightly
+    image: ghcr.io/bnb-chain/reth-bsc:v0.0.8-alpha
     container_name: bsc-reth
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /data/rpc_nodes/bsc-data/reth:/data
+      - /data/rpc_nodes/bsc-data/reth/data-seed/data_dir:/data
     command:
       - node
       - --full
@@ -23,3 +23,4 @@ services:
       - --ws.origins=*
       - --port=30603
       - --discovery.port=30603
+      - --authrpc.port=8553
