@@ -1,14 +1,4 @@
-# BSC Reth MDBX full node snapshot (bnb-chain official, ~3 TiB)
-# Source: https://github.com/bnb-chain/bsc-snapshots
-# Updated: 2026-02-02
-https://pub-c5400abe5bed4adbaf8cd47467747e74.r2.dev/20260202_mainnet_reth_mdbx_full_node.tar.zst
-
-# --- Geth PBSS snapshots (legacy, kept for reference) ---
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-base-73745891.tar.lz4
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-blocks-73655891.tar.lz4
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-blocks-52560000.tar.lz4
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-blocks-21024000.tar.lz4
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-blocks-42048000.tar.lz4
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-blocks-63072000.tar.lz4
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-blocks-31536000.tar.lz4
-# https://pub-c0627345c16f47ab858c9469133073a8.r2.dev/mainnet-geth-pbss-blocks-10512000.tar.lz4
+# BSC Geth full node snapshot (48Club, ~964 GB)
+# Source: https://github.com/48Club/bsc-snapshots
+# Updated: 2026-03-03
+https://complete.snapshots.48.club/geth.full.84000000.tar.zst

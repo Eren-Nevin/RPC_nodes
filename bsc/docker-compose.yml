@@ -1,26 +1,21 @@
 services:
-  reth:
-    image: ghcr.io/bnb-chain/reth-bsc:v0.0.8-alpha
-    container_name: bsc-reth
+  geth:
+    image: ghcr.io/bnb-chain/bsc:1.6.7
+    container_name: bsc-geth
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /data/rpc_nodes/bsc-data/reth/data-seed/data_dir:/data
+      - /data/rpc_nodes/bsc-data:/data
+      - ./config.toml:/config/config.toml:ro
+      - ./genesis.json:/config/genesis.json:ro
     command:
-      - node
-      - --full
-      - --chain=bsc
+      - --config=/config/config.toml
       - --datadir=/data
-      - --http
-      - --http.addr=0.0.0.0
-      - --http.port=8845
-      - --http.api=eth,net,web3,txpool,debug
-      - --http.corsdomain=*
-      - --ws
-      - --ws.addr=0.0.0.0
-      - --ws.port=8846
-      - --ws.api=eth,net,web3,txpool
-      - --ws.origins=*
-      - --port=30603
-      - --discovery.port=30603
-      - --authrpc.port=8553
+      - --cache=8000
+      - --rpc.allow-unprotected-txs
+      - --history.transactions=0
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
