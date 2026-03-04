@@ -5,11 +5,10 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /data/rpc_nodes/bsc-data:/data
-      - ./config.toml:/config/config.toml:ro
-      - ./genesis.json:/config/genesis.json:ro
+      - /data/rpc_nodes/bsc-data/full:/data
+      - ./config.toml:/bsc/config/config.toml:ro
+      - ./genesis.json:/bsc/config/genesis.json:ro
     command:
-      - --config=/config/config.toml
       - --datadir=/data
       - --cache=8000
       - --rpc.allow-unprotected-txs

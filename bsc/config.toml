@@ -24,6 +24,7 @@ Percentile = 60
 OracleThreshold = 1000
 
 [Node]
+DataDir = "/data"
 IPCPath = "geth.ipc"
 HTTPHost = "0.0.0.0"
 InsecureUnlockAllowed = false
@@ -43,7 +44,7 @@ ListenAddr = ":30603"
 EnableMsgEvents = false
 
 [Node.LogConfig]
-FilePath = "bsc.log"
+FilePath = ""
 MaxBytesSize = 10485760
 Level = "info"
 FileRoot = ""
