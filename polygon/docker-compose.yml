@@ -11,7 +11,7 @@ services:
       - --home=/heimdall-home
 
   bor:
-    image: 0xpolygon/bor:2.5.7
+    image: 0xpolygon/bor:2.6.0
     container_name: polygon-bor
     restart: unless-stopped
     network_mode: host

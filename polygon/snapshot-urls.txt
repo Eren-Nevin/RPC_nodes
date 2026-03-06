@@ -1,5 +1,5 @@
 # Polygon PoS Mainnet Snapshot URLs
-# Updated: 2026-02-16
+# Updated: 2026-03-06
 #
 # ==============================================================================
 # IMPORTANT NOTES
@@ -24,20 +24,21 @@
 
 # Bor Mainnet - TWO PARTS (base + incremental):
 # Part 1 (base): https://snapshots.publicnode.com/polygon-bor-base-0-75817088.tar.lz4
-# Part 2 (incremental): https://snapshots.publicnode.com/polygon-bor-part-75817089-82996792.tar.lz4
+# Part 2 (incremental): https://snapshots.publicnode.com/polygon-bor-part-75817089-83774388.tar.lz4
 
 # Heimdall Mainnet:
 # https://snapshots.publicnode.com/polygon-heimdall-24404501-39092570.tar.lz4
 
 # Download with aria2c (16 parallel connections, supports resume):
 #   aria2c -x 16 -s 16 -d /data/rpc_nodes/polygon-data/ "https://snapshots.publicnode.com/polygon-bor-base-0-75817088.tar.lz4"
-#   aria2c -x 16 -s 16 -d /data/rpc_nodes/polygon-data/ "https://snapshots.publicnode.com/polygon-bor-part-75817089-82996792.tar.lz4"
+#   aria2c -x 16 -s 16 -d /data/rpc_nodes/polygon-data/ "https://snapshots.publicnode.com/polygon-bor-part-75817089-83774388.tar.lz4"
 #   aria2c -x 16 -s 16 -d /data/rpc_nodes/polygon-data/ "https://snapshots.publicnode.com/polygon-heimdall-24404501-39092570.tar.lz4"
 
 # Extract Bor (both parts to same directory):
-#   mkdir -p /data/rpc_nodes/polygon-data/bor/bor/chaindata
-#   lz4 -dc /data/rpc_nodes/polygon-data/polygon-bor-base-0-75817088.tar.lz4 | tar -xf - -C /data/rpc_nodes/polygon-data/bor/bor/chaindata
-#   lz4 -dc /data/rpc_nodes/polygon-data/polygon-bor-part-75817089-82996792.tar.lz4 | tar -xf - -C /data/rpc_nodes/polygon-data/bor/bor/chaindata
+# Tar contains bor/chaindata/ prefix, so extract to bor/ root:
+#   mkdir -p /data/rpc_nodes/polygon-data/bor
+#   lz4 -dc /data/rpc_nodes/polygon-data/polygon-bor-base-0-75817088.tar.lz4 | tar -xf - -C /data/rpc_nodes/polygon-data/bor
+#   lz4 -dc /data/rpc_nodes/polygon-data/polygon-bor-part-75817089-83774388.tar.lz4 | tar -xf - -C /data/rpc_nodes/polygon-data/bor
 
 # Extract Heimdall (into data/ subdirectory):
 #   mkdir -p /data/rpc_nodes/polygon-data/heimdall/data
