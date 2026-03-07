@@ -36,6 +36,7 @@ docker compose run --rm init
 | Arbitrum One | Nitro | Full | ~2.8 TB | ~200 GB | 8547 |
 | Base (OP Stack) | Reth / Geth / Nethermind + op-node | Archive | ~7-8 TB | 50-100 GB/week | 8645 |
 | Polygon PoS | Bor + Heimdall | Full | ~6 TB | ~3 TB | 8745 |
+| Tron | java-tron | Full / Lite | ~2.9 TB / ~57 GB | ~200 GB | 8090 |
 
 ---
 
@@ -52,6 +53,7 @@ docker compose run --rm init
 ├── base/               # Base L2 (OP Stack, git submodule)
 ├── polygon/            # Polygon PoS (Bor + Heimdall)
 ├── bsc/                # BSC (snapshot tooling, WIP)
+├── tron/               # Tron (java-tron)
 ├── nginx/              # Shared reverse proxy config (rpc.defistream.dev)
 └── chains_self_host.md # Hardware/storage reference for 22+ chains
 ```
@@ -65,6 +67,7 @@ docker compose run --rm init
 | Arbitrum | `arbitrum/docker-compose.yml` |
 | Base | `base/base-node/docker-compose.yml` |
 | Polygon | `polygon/docker-compose.yml` |
+| Tron | `tron/docker-compose.yml` |
 
 ### Data directory on disk
 
@@ -76,7 +79,8 @@ All chain data lives under `/data/rpc_nodes/`:
 ├── arbitrum/        # populated by download-snapshot / Nitro
 ├── base-data/       # populated by download-snapshot / op-reth
 ├── polygon-data/    # populated by download-snapshot / Bor + Heimdall
-└── bsc-data/
+├── bsc-data/
+└── tron-data/       # populated by download-snapshot / java-tron
 ```
 
 ---
@@ -98,6 +102,8 @@ Once running, nodes expose:
 | Polygon | HTTP | 8745 | `http://localhost:8745` |
 | Polygon | WebSocket | 8746 | `ws://localhost:8746` |
 | Polygon | Heimdall | 26657 | `http://localhost:26657` |
+| Tron | HTTP RPC | 8090 | `http://localhost:8090` |
+| Tron | gRPC | 50051 | `localhost:50051` |
 
 ---
 
@@ -168,7 +174,7 @@ Use the `download-snapshot` script to download and extract snapshots for any sup
 ```
 ./download-snapshot -n <node> [-t full|pruned] [-x] [-d <data-root>]
 
-  -n  Node (required): eth | arb | base | polygon
+  -n  Node (required): eth | arb | base | polygon | bsc | tron
   -t  Snapshot type: full (default) | pruned
   -x  Extract-only: scan data dir for already-downloaded files and extract them
   -d  Override data root (default: /data/rpc_nodes)
@@ -192,6 +198,7 @@ apt-get install aria2 zstd lz4
 | arb | ✅ ~2.8 TB | ❌ | PublicNode (base + part lz4, auto-discovered) |
 | base | ✅ ~7-8 TB | ✅ ~4-5 TB | base.org (auto-resolved) |
 | polygon | ✅ ~6 TB | ❌ | PublicNode (3 × lz4, auto-discovered) |
+| tron | ✅ ~2.875 TB | ✅ ~57 GB | TRON Foundation servers (auto-discovered) |
 
 ### Examples
 
@@ -211,10 +218,17 @@ sudo ./download-snapshot -n base -t pruned
 # Polygon — downloads 3 lz4 files (heimdall + bor-base + bor-part)
 sudo ./download-snapshot -n polygon
 
+# Tron — full node (~2.875 TB)
+sudo ./download-snapshot -n tron -t full
+
+# Tron — lite fullnode (downloaded then extracted, ~57 GB)
+sudo ./download-snapshot -n tron -t pruned
+
 # Extract-only mode (files already downloaded, just extract)
 sudo ./download-snapshot -n eth -x
 sudo ./download-snapshot -n arb -x
 sudo ./download-snapshot -n polygon -x
+sudo ./download-snapshot -n tron -x
 ```
 
 > **Tip:** Run inside `screen` or `tmux` — downloads can take many hours.
@@ -452,6 +466,56 @@ curl -s http://localhost:26657/status
 
 ---
 
+### Tron
+
+**Stack:** java-tron v4.8.1
+
+#### 1. Download a snapshot
+
+Tron snapshots are served by the TRON Foundation (~3x/week). The script auto-discovers the latest dated directory from the server index and falls back to `tron/snapshot-urls.txt`.
+
+```bash
+# Full node (~2.875 TB, streamed directly into data dir — no temp file needed)
+sudo ./download-snapshot -n tron -t full
+
+# Lite fullnode / pruned (~57 GB, downloaded then extracted)
+sudo ./download-snapshot -n tron -t pruned
+```
+
+#### 2. Start
+
+```bash
+cd tron
+docker compose up -d
+```
+
+#### 3. Verify
+
+```bash
+# Check node info via HTTP RPC
+curl -s http://localhost:8090/wallet/getnodeinfo | python3 -m json.tool | head -30
+
+# Check block height
+curl -s http://localhost:8090/wallet/getnowblock | python3 -m json.tool | grep -E '"number"'
+```
+
+#### Ports
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 8090 | HTTP | JSON-RPC (wallet API) |
+| 50051 | TCP | gRPC |
+| 18888 | TCP/UDP | P2P peering |
+
+#### Gotchas
+
+- The data volume is mounted at `/java-tron/output-directory` inside the container. Extracted snapshot contents land directly there.
+- Full snapshots are LevelDB format (~2.875 TB); lite snapshots are also LevelDB but contain only recent state (~57 GB).
+- Snapshot servers are updated roughly every 2-3 days. If auto-discovery fails, update `tron/snapshot-urls.txt` with the latest `backup{YYYYMMDD}` directory from `http://34.86.86.229/` (full) or `http://34.143.247.77/` (lite).
+- java-tron does not expose a standard `eth_syncing` endpoint. Use `/wallet/getnodeinfo` to check sync status.
+
+---
+
 ## Shared L1 Dependency
 
 Arbitrum, Base, and Polygon all require an Ethereum L1 RPC endpoint. You have two options:
@@ -528,6 +592,7 @@ For Base (submodule): `cd base/base-node && git fetch --tags && git checkout <ne
 | Base | Nethermind | 1.35.3 |
 | Polygon | Bor | v2.5.7 |
 | Polygon | Heimdall | v0.6.0 |
+| Tron | java-tron | v4.8.1 (GreatVoyage) |
 
 ---
 
@@ -565,10 +630,12 @@ sudo ./download-snapshot -n eth
 sudo ./download-snapshot -n arb
 sudo ./download-snapshot -n base -t full
 sudo ./download-snapshot -n polygon
+sudo ./download-snapshot -n tron -t pruned   # or -t full for full node
 
 # 5. Start each chain node
 cd eth && docker compose up -d && cd ..
 cd arbitrum && docker compose up -d && cd ..
 cd base && docker compose up -d && cd ..
 cd polygon && docker compose up -d && cd ..
+cd tron && docker compose up -d && cd ..
 ```

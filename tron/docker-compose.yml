@@ -1,0 +1,15 @@
+services:
+  tron:
+    image: tronprotocol/java-tron:GreatVoyage-v4.8.1
+    container_name: tron-node
+    restart: unless-stopped
+    volumes:
+      - /data/rpc_nodes/tron-data:/java-tron/output-directory
+    ports:
+      - "8090:8090"        # HTTP RPC
+      - "50051:50051"      # gRPC
+      - "18888:18888"      # P2P TCP
+      - "18888:18888/udp"  # P2P UDP
+    command:
+      - -c
+      - /java-tron/config/main_net_config.conf

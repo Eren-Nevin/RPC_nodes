@@ -1,0 +1,22 @@
+# Tron snapshot fallback URLs
+# Auto-discovery tries multiple TRON Foundation servers and verifies file exists via HEAD.
+#
+# Update these when auto-discovery fails (check servers for latest backup{YYYYMMDD} dir).
+#
+# Working servers (as of 2026-03-07):
+#   http://35.247.128.170/    Singapore, LevelDB + internal txns (full + lite)
+#   http://34.48.6.163/       Americas, LevelDB + historical balances (full only, weekly)
+#   http://35.197.17.205/     Americas, RocksDB (full only)
+#
+# Unreliable (dir listing shows files but they 404):
+#   http://34.143.247.77/     Singapore, LevelDB
+#   http://34.86.86.229/      Americas, LevelDB
+#
+# Alternative (not used by script):
+#   PublicNode (pruned ~1.1 TB): https://snapshots.publicnode.com/tron-pruned-{block}.tar.lz4
+
+# Full node (~3 TB)
+http://35.247.128.170/backup20260306/FullNode_output-directory.tgz
+
+# Lite fullnode / truncated (~57 GB)
+http://35.247.128.170/backup20260306/LiteFullNode_output-directory.tgz

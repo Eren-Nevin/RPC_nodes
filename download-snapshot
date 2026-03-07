@@ -5,7 +5,7 @@
 #   ./download-snapshot -n <node> [-t full|pruned] [-x] [-d <data-root>]
 #
 # Options:
-#   -n  Node name (required): eth | arb | base | polygon | bsc
+#   -n  Node name (required): eth | arb | base | polygon | bsc | tron
 #   -t  Snapshot type: full (default) | pruned
 #   -x  Extract-only mode: scan data dir for already-downloaded files and extract them
 #   -d  Override data root (default: /data/rpc_nodes)
@@ -41,13 +41,13 @@ done
 
 # ─── validate args ────────────────────────────────────────────────────────────
 if [[ -z "$NODE" ]]; then
-  echo "ERROR: -n <node> is required (eth | arb | base | polygon | bsc)" >&2
+  echo "ERROR: -n <node> is required (eth | arb | base | polygon | bsc | tron)" >&2
   usage 1
 fi
 
 case "$NODE" in
-  eth|arb|base|polygon|bsc) ;;
-  *) echo "ERROR: Unknown node '${NODE}'. Must be one of: eth arb base polygon bsc" >&2; exit 1 ;;
+  eth|arb|base|polygon|bsc|tron) ;;
+  *) echo "ERROR: Unknown node '${NODE}'. Must be one of: eth arb base polygon bsc tron" >&2; exit 1 ;;
 esac
 
 case "$TYPE" in
@@ -88,12 +88,34 @@ download() {
     "$url"
 }
 
+download_limited() {
+  local url="$1"
+  local dest_dir="$2"
+  local filename
+  filename="$(basename "$url")"
+  echo "==> Downloading (2 connections): $url"
+  echo "    → ${dest_dir}/${filename}"
+  aria2c -x 2 -s 2 --file-allocation=none \
+    --continue=true \
+    -d "$dest_dir" \
+    "$url"
+}
+
 extract_zst() {
   local file="$1"
   local dest="$2"
   echo "==> Extracting (zstd): $file → $dest"
   mkdir -p "$dest"
   zstd -d --long=31 --stdout "$file" | tar -xf - -C "$dest"
+}
+
+extract_tgz() {
+  local file="$1"
+  local dest="$2"
+  local strip="${3:-0}"
+  echo "==> Extracting (tgz, strip=$strip): $file → $dest"
+  mkdir -p "$dest"
+  tar -xzf "$file" -C "$dest" --strip-components="$strip"
 }
 
 extract_lz4() {
@@ -545,6 +567,138 @@ do_bsc_pruned() {
   fix_ownership "$dest"
 }
 
+# ── TRON ──────────────────────────────────────────────────────────────────────
+# full   = FullNode_output-directory.tgz     (~2.875 TB, downloaded then extracted)
+# pruned = LiteFullNode_output-directory.tgz (~57 GB, downloaded then extracted)
+do_tron() {
+  local dest="${DATA_ROOT}/tron-data"
+  local urls_file="${SCRIPT_DIR}/tron/snapshot-urls.txt"
+
+  if [[ "$EXTRACT_ONLY" == true ]]; then
+    local found=()
+    while IFS= read -r -d '' f; do found+=("$f"); done \
+      < <(find "$dest" -maxdepth 1 -name "*.tgz" -print0 2>/dev/null)
+    if [[ ${#found[@]} -eq 0 ]]; then
+      echo "ERROR: No *.tgz files found in $dest" >&2
+      exit 1
+    fi
+    for f in "${found[@]}"; do
+      extract_tgz "$f" "$dest" 1
+    done
+    fix_ownership "$dest"
+    return
+  fi
+
+  # Auto-discover latest backup dir from TRON Foundation servers.
+  # Try multiple servers in order; first success wins.
+  local servers=(
+    "http://35.247.128.170"    # Singapore, LevelDB + internal txns
+    "http://34.48.6.163"       # Americas, LevelDB + historical balances
+    "http://34.143.247.77"     # Singapore, LevelDB
+    "http://34.86.86.229"      # Americas, LevelDB
+  )
+  local full_url="" lite_url=""
+
+  echo "==> Attempting auto-discovery of Tron snapshots from TRON Foundation servers ..."
+
+  for server in "${servers[@]}"; do
+    if [[ -n "$full_url" && -n "$lite_url" ]]; then
+      break
+    fi
+
+    local listing
+    listing="$(curl -sS --connect-timeout 10 "${server}/" 2>/dev/null || true)"
+    if [[ -z "$listing" ]] || echo "$listing" | grep -q "404 Not Found"; then
+      continue
+    fi
+
+    local latest_dir
+    latest_dir="$(echo "$listing" | grep -oE 'backup[0-9]{8}' | sort -r | head -1 || true)"
+    if [[ -z "$latest_dir" ]]; then
+      continue
+    fi
+
+    echo "==> Found ${latest_dir} on ${server}"
+
+    if [[ -z "$full_url" ]]; then
+      # Verify the file actually exists with a HEAD request
+      local candidate="${server}/${latest_dir}/FullNode_output-directory.tgz"
+      local http_code
+      http_code="$(curl -sS --connect-timeout 10 -o /dev/null -w '%{http_code}' --head "$candidate" 2>/dev/null || true)"
+      if [[ "$http_code" == "200" ]]; then
+        full_url="$candidate"
+      fi
+    fi
+
+    if [[ -z "$lite_url" ]]; then
+      local candidate="${server}/${latest_dir}/LiteFullNode_output-directory.tgz"
+      local http_code
+      http_code="$(curl -sS --connect-timeout 10 -o /dev/null -w '%{http_code}' --head "$candidate" 2>/dev/null || true)"
+      if [[ "$http_code" == "200" ]]; then
+        lite_url="$candidate"
+      fi
+    fi
+  done
+
+  # Fallback: parse tron/snapshot-urls.txt
+  if [[ "$TYPE" == "full" && -z "$full_url" ]]; then
+    echo "==> Auto-discovery failed for full, falling back to tron/snapshot-urls.txt ..."
+    if [[ ! -f "$urls_file" ]]; then
+      echo "ERROR: $urls_file not found and auto-discovery failed." >&2
+      exit 1
+    fi
+    full_url="$(grep -oE 'http://[0-9.]+/backup[0-9]+/FullNode_output-directory\.tgz' "$urls_file" | head -1 || true)"
+  fi
+
+  if [[ "$TYPE" == "pruned" && -z "$lite_url" ]]; then
+    echo "==> Auto-discovery failed for pruned, falling back to tron/snapshot-urls.txt ..."
+    if [[ ! -f "$urls_file" ]]; then
+      echo "ERROR: $urls_file not found and auto-discovery failed." >&2
+      exit 1
+    fi
+    lite_url="$(grep -oE 'http://[0-9.]+/backup[0-9]+/LiteFullNode_output-directory\.tgz' "$urls_file" | head -1 || true)"
+  fi
+
+  mkdir -p "$dest"
+
+  case "$TYPE" in
+    full)
+      if [[ -z "$full_url" ]]; then
+        echo "ERROR: Could not resolve Tron full snapshot URL." >&2
+        echo "Update tron/snapshot-urls.txt with the latest backup dir from ${full_server}/" >&2
+        exit 1
+      fi
+      echo "==> Resolved full URL: $full_url"
+      download_limited "$full_url" "$dest"
+      local full_file
+      full_file="$(ls -t "${dest}"/FullNode_output-directory.tgz 2>/dev/null | head -1)"
+      if [[ -z "$full_file" ]]; then
+        echo "ERROR: Could not find downloaded snapshot file in $dest" >&2
+        exit 1
+      fi
+      extract_tgz "$full_file" "$dest" 1
+      ;;
+    pruned)
+      if [[ -z "$lite_url" ]]; then
+        echo "ERROR: Could not resolve Tron lite snapshot URL." >&2
+        echo "Update tron/snapshot-urls.txt with the latest backup dir from ${lite_server}/" >&2
+        exit 1
+      fi
+      echo "==> Resolved lite URL: $lite_url"
+      download_limited "$lite_url" "$dest"
+      local snapshot_file
+      snapshot_file="$(ls -t "${dest}"/LiteFullNode_output-directory.tgz 2>/dev/null | head -1)"
+      if [[ -z "$snapshot_file" ]]; then
+        echo "ERROR: Could not find downloaded snapshot file in $dest" >&2
+        exit 1
+      fi
+      extract_tgz "$snapshot_file" "$dest" 1
+      ;;
+  esac
+
+  fix_ownership "$dest"
+}
+
 # ─── dispatch ─────────────────────────────────────────────────────────────────
 echo "=== download-snapshot: node=${NODE} type=${TYPE} extract_only=${EXTRACT_ONLY} data_root=${DATA_ROOT} ==="
 
@@ -554,6 +708,7 @@ case "$NODE" in
   base)    do_base ;;
   polygon) do_polygon ;;
   bsc)     do_bsc ;;
+  tron)    do_tron ;;
 esac
 
 echo "=== Done ==="

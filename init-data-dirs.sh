@@ -14,7 +14,8 @@ mkdir -p \
   "${DATA_ROOT}/arbitrum" \
   "${DATA_ROOT}/base-data" \
   "${DATA_ROOT}/polygon-data" \
-  "${DATA_ROOT}/bsc-data"
+  "${DATA_ROOT}/bsc-data" \
+  "${DATA_ROOT}/tron-data"
 
 chown -R 1000:1000 "${DATA_ROOT}"
 
