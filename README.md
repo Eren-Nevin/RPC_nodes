@@ -36,7 +36,7 @@ docker compose run --rm init
 | Arbitrum One | Nitro | Full | ~2.8 TB | ~200 GB | 8547 |
 | Base (OP Stack) | Reth / Geth / Nethermind + op-node | Archive | ~7-8 TB | 50-100 GB/week | 8645 |
 | Polygon PoS | Bor + Heimdall | Full | ~6 TB | ~3 TB | 8745 |
-| Tron | java-tron | Full / Lite | ~2.9 TB / ~57 GB | ~200 GB | 8090 |
+| Tron | java-tron | Full / Lite | ~2.9 TB / ~57 GB | ~200 GB | 8190 |
 
 ---
 
@@ -102,7 +102,7 @@ Once running, nodes expose:
 | Polygon | HTTP | 8745 | `http://localhost:8745` |
 | Polygon | WebSocket | 8746 | `ws://localhost:8746` |
 | Polygon | Heimdall | 26657 | `http://localhost:26657` |
-| Tron | HTTP RPC | 8090 | `http://localhost:8090` |
+| Tron | HTTP RPC | 8190 | `http://localhost:8190` |
 | Tron | gRPC | 50051 | `localhost:50051` |
 
 ---
@@ -493,17 +493,17 @@ docker compose up -d
 
 ```bash
 # Check node info via HTTP RPC
-curl -s http://localhost:8090/wallet/getnodeinfo | python3 -m json.tool | head -30
+curl -s http://localhost:8190/wallet/getnodeinfo | python3 -m json.tool | head -30
 
 # Check block height
-curl -s http://localhost:8090/wallet/getnowblock | python3 -m json.tool | grep -E '"number"'
+curl -s http://localhost:8190/wallet/getnowblock | python3 -m json.tool | grep -E '"number"'
 ```
 
 #### Ports
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
-| 8090 | HTTP | JSON-RPC (wallet API) |
+| 8190 (→8090) | HTTP | JSON-RPC (wallet API) |
 | 50051 | TCP | gRPC |
 | 18888 | TCP/UDP | P2P peering |
 
