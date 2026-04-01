@@ -1,0 +1,18 @@
+services:
+  node:
+    build: .
+    container_name: hyperliquid-node
+    restart: unless-stopped
+    ports:
+      - "3001:3001"        # EVM RPC (/evm) + Info API (/info)
+      - "4001:4001"        # P2P gossip
+      - "4002:4002"        # P2P gossip
+    volumes:
+      - /data/rpc_nodes/hyperliquid-data:/home/hluser/hl/data
+
+  pruner:
+    build: ./pruner
+    container_name: hyperliquid-pruner
+    restart: unless-stopped
+    volumes:
+      - /data/rpc_nodes/hyperliquid-data:/home/hluser/hl/data

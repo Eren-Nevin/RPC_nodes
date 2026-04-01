@@ -1,0 +1,14 @@
+{
+  "root_node_ips": [
+    {"Ip": "52.193.46.25"},
+    {"Ip": "64.31.51.130"},
+    {"Ip": "18.182.115.79"},
+    {"Ip": "18.180.228.50"},
+    {"Ip": "54.95.224.41"}
+  ],
+  "try_new_peers": true,
+  "chain": "Mainnet",
+  "reserved_peer_ips": [],
+  "n_gossip_peers": 8,
+  "split_client_blocks": false
+}

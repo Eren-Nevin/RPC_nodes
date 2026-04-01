@@ -37,6 +37,7 @@ docker compose run --rm init
 | Base (OP Stack) | Reth / Geth / Nethermind + op-node | Archive | ~7-8 TB | 50-100 GB/week | 8645 |
 | Polygon PoS | Bor + Heimdall | Full | ~6 TB | ~3 TB | 8745 |
 | Tron | java-tron | Full / Lite | ~2.9 TB / ~57 GB | ~200 GB | 8190 |
+| Hyperliquid | hl-visor (proprietary) | 90-day L1 + full EVM | ~9 TB | ~3 TB | 3001 |
 
 ---
 
@@ -54,6 +55,7 @@ docker compose run --rm init
 ├── polygon/            # Polygon PoS (Bor + Heimdall)
 ├── bsc/                # BSC (snapshot tooling, WIP)
 ├── tron/               # Tron (java-tron)
+├── hyperliquid/        # Hyperliquid (hl-visor, non-validator)
 ├── nginx/              # Shared reverse proxy config (rpc.defistream.dev)
 └── chains_self_host.md # Hardware/storage reference for 22+ chains
 ```
@@ -68,6 +70,7 @@ docker compose run --rm init
 | Base | `base/base-node/docker-compose.yml` |
 | Polygon | `polygon/docker-compose.yml` |
 | Tron | `tron/docker-compose.yml` |
+| Hyperliquid | `hyperliquid/docker-compose.yml` |
 
 ### Data directory on disk
 
@@ -80,7 +83,8 @@ All chain data lives under `/data/rpc_nodes/`:
 ├── base-data/       # populated by download-snapshot / op-reth
 ├── polygon-data/    # populated by download-snapshot / Bor + Heimdall
 ├── bsc-data/
-└── tron-data/       # populated by download-snapshot / java-tron
+├── tron-data/       # populated by download-snapshot / java-tron
+└── hyperliquid-data/  # populated by hl-visor streaming from peers
 ```
 
 ---
@@ -104,6 +108,8 @@ Once running, nodes expose:
 | Polygon | Heimdall | 26657 | `http://localhost:26657` |
 | Tron | HTTP RPC | 8190 | `http://localhost:8190` |
 | Tron | gRPC | 50051 | `localhost:50051` |
+| Hyperliquid | EVM RPC | 3001 | `http://localhost:3001/evm` |
+| Hyperliquid | Info API | 3001 | `http://localhost:3001/info` |
 
 ---
 
@@ -516,6 +522,79 @@ curl -s http://localhost:8190/wallet/getnowblock | python3 -m json.tool | grep -
 
 ---
 
+### Hyperliquid
+
+**Stack:** hl-visor (proprietary binary, auto-updates hl-node)
+
+Hyperliquid is a custom L1 chain (HyperBFT consensus) with an embedded EVM layer (HyperEVM). The node binary is closed-source and only runs on Ubuntu 24.04. It streams data from peers — there is no database snapshot to download.
+
+#### 1. Build and start
+
+```bash
+cd hyperliquid
+docker compose up -d --build
+```
+
+This starts two containers:
+- **node** — runs `hl-visor run-non-validator` with EVM RPC and Info API enabled
+- **pruner** — cron job (daily at 03:00) that deletes L1 data older than 90 days
+
+The node will begin streaming data from the network immediately. No snapshot download is needed.
+
+#### 2. Verify
+
+```bash
+# EVM RPC (chain ID: 999)
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://localhost:3001/evm
+
+# Info API
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"type":"exchangeStatus"}' \
+  http://localhost:3001/info
+```
+
+#### 3. Historical EVM blocks (optional)
+
+The node only serves EVM data from the time it starts streaming. To backfill historical EVM blocks, use the [block-importer](https://github.com/hyperliquid-dex/block-importer) tool with data from S3:
+
+```bash
+# Requires AWS credentials (requester-pays bucket)
+aws s3 sync s3://hl-mainnet-evm-blocks/ ./evm-blocks --request-payer requester
+
+# Import into the node's database
+cargo run --release -- --start-block 1 --end-block 30000000 \
+  --ingest-dir ./evm-blocks --db-dir /data/rpc_nodes/hyperliquid-data
+```
+
+#### Ports
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 3001 | HTTP | EVM RPC (`/evm`) + Info API (`/info`) |
+| 4001-4002 | TCP | P2P gossip (must be open to public) |
+
+#### Storage
+
+| Component | Size | Growth |
+|-----------|------|--------|
+| L1 data (90-day retention) | ~9 TB | ~100 GB/day, pruned to 90 days |
+| EVM block data (kept forever) | ~40-80 GB | ~200-500 MB/day |
+
+#### Gotchas
+
+- **Not a standard EVM chain.** The binary is proprietary (`hl-visor`), not Geth/Reth. It auto-updates itself.
+- **No snapshot download.** The node bootstraps by streaming from peers. Initial sync happens live.
+- **No WebSocket support** on the local RPC server.
+- **UID 10000.** The container runs as `hluser` (UID 10000), not 1000 like other chains.
+- **Pruner keeps 90 days of L1 data** and excludes `evm_block_and_receipts` (kept forever). Adjust `pruner/scripts/prune.sh` to change retention.
+- **100 GB/day** of L1 data without pruning. Monitor disk usage carefully.
+- **Info API limitations:** The local server only supports state-based queries. Historical time series and WebSocket subscriptions are not available locally.
+- **Rebuilding the image** fetches the latest `hl-visor` binary. The visor also auto-updates `hl-node` at runtime.
+
+---
+
 ## Shared L1 Dependency
 
 Arbitrum, Base, and Polygon all require an Ethereum L1 RPC endpoint. You have two options:
@@ -593,6 +672,7 @@ For Base (submodule): `cd base/base-node && git fetch --tags && git checkout <ne
 | Polygon | Bor | v2.5.7 |
 | Polygon | Heimdall | v0.6.0 |
 | Tron | java-tron | v4.8.1 (GreatVoyage) |
+| Hyperliquid | hl-visor | auto-updating |
 
 ---
 
@@ -638,4 +718,5 @@ cd arbitrum && docker compose up -d && cd ..
 cd base && docker compose up -d && cd ..
 cd polygon && docker compose up -d && cd ..
 cd tron && docker compose up -d && cd ..
+cd hyperliquid && docker compose up -d --build && cd ..
 ```

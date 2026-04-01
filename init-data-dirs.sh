@@ -15,7 +15,8 @@ mkdir -p \
   "${DATA_ROOT}/base-data" \
   "${DATA_ROOT}/polygon-data" \
   "${DATA_ROOT}/bsc-data" \
-  "${DATA_ROOT}/tron-data"
+  "${DATA_ROOT}/tron-data" \
+  "${DATA_ROOT}/hyperliquid-data"
 
 chown -R 1000:1000 "${DATA_ROOT}"
 
