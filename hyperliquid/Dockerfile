@@ -31,4 +31,4 @@ RUN curl -o /home/$USERNAME/hl-visor $HL_VISOR_URL \
 
 EXPOSE 3001 4000-4010
 
-ENTRYPOINT ["/home/hluser/hl-visor", "run-non-validator", "--serve-eth-rpc", "--serve-info"]
+ENTRYPOINT ["/home/hluser/hl-visor", "run-non-validator", "--serve-eth-rpc", "--serve-info", "--write-fills", "--write-misc-events", "--batch-by-block"]
