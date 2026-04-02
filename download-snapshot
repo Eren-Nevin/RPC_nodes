@@ -41,13 +41,13 @@ done
 
 # ─── validate args ────────────────────────────────────────────────────────────
 if [[ -z "$NODE" ]]; then
-  echo "ERROR: -n <node> is required (eth | arb | base | polygon | bsc | tron)" >&2
+  echo "ERROR: -n <node> is required (eth | arb | base | polygon | bsc | tron | bitcoin)" >&2
   usage 1
 fi
 
 case "$NODE" in
-  eth|arb|base|polygon|bsc|tron) ;;
-  *) echo "ERROR: Unknown node '${NODE}'. Must be one of: eth arb base polygon bsc tron" >&2; exit 1 ;;
+  eth|arb|base|polygon|bsc|tron|bitcoin) ;;
+  *) echo "ERROR: Unknown node '${NODE}'. Must be one of: eth arb base polygon bsc tron bitcoin" >&2; exit 1 ;;
 esac
 
 case "$TYPE" in
@@ -699,6 +699,96 @@ do_tron() {
   fix_ownership "$dest"
 }
 
+# ── Bitcoin ─────────────────────────────────────────────────────────────────────
+# PublicNode provides Bitcoin snapshots as base + incremental lz4 tars.
+do_bitcoin() {
+  local dest="${DATA_ROOT}/bitcoin-data"
+
+  if [[ "$EXTRACT_ONLY" == true ]]; then
+    local base_file part_file
+    base_file="$(ls -t "${dest}"/bitcoin-base*.tar.lz4 2>/dev/null | head -1)"
+    part_file="$(ls -t "${dest}"/bitcoin-part-*.tar.lz4 2>/dev/null | head -1)"
+
+    if [[ -z "$base_file" || -z "$part_file" ]]; then
+      echo "ERROR: Could not find all snapshot files in $dest" >&2
+      echo "  base : ${base_file:-<not found>}" >&2
+      echo "  part : ${part_file:-<not found>}" >&2
+      exit 1
+    fi
+
+    extract_lz4 "$base_file" "$dest"
+    extract_lz4 "$part_file" "$dest"
+    fix_ownership "$dest"
+    return
+  fi
+
+  # Try to auto-discover from publicnode.com/snapshots listing
+  echo "==> Attempting auto-discovery of Bitcoin snapshots from publicnode.com ..."
+  local base_url="" part_url=""
+
+  local listing
+  listing="$(curl -sSf "https://publicnode.com/snapshots" 2>/dev/null || true)"
+
+  if [[ -n "$listing" ]]; then
+    base_url="$(echo "$listing" | grep -oE 'https://snapshots\.publicnode\.com/bitcoin-base[^"]*\.tar\.lz4' | head -1 || true)"
+    part_url="$(echo "$listing" | grep -oE 'https://snapshots\.publicnode\.com/bitcoin-part-[0-9]+\.tar\.lz4' | head -1 || true)"
+  fi
+
+  # Fallback: parse snapshot-urls.txt
+  if [[ -z "$base_url" || -z "$part_url" ]]; then
+    echo "==> Auto-discovery incomplete, falling back to bitcoin/snapshot-urls.txt ..."
+    local urls_file="${SCRIPT_DIR}/bitcoin/snapshot-urls.txt"
+    if [[ ! -f "$urls_file" ]]; then
+      echo "ERROR: $urls_file not found and auto-discovery failed." >&2
+      exit 1
+    fi
+
+    if [[ -z "$base_url" ]]; then
+      base_url="$(grep -oE 'https://snapshots\.publicnode\.com/bitcoin-base[^"]*\.tar\.lz4' "$urls_file" | head -1 || true)"
+    fi
+    if [[ -z "$part_url" ]]; then
+      part_url="$(grep -oE 'https://snapshots\.publicnode\.com/bitcoin-part-[0-9]+\.tar\.lz4' "$urls_file" | head -1 || true)"
+    fi
+  fi
+
+  if [[ -z "$base_url" || -z "$part_url" ]]; then
+    echo "ERROR: Could not resolve Bitcoin snapshot URLs." >&2
+    echo "  base : ${base_url:-<not found>}" >&2
+    echo "  part : ${part_url:-<not found>}" >&2
+    echo "Update bitcoin/snapshot-urls.txt with current publicnode.com URLs." >&2
+    exit 1
+  fi
+
+  echo "==> Resolved URLs:"
+  echo "    base : $base_url"
+  echo "    part : $part_url"
+
+  mkdir -p "$dest"
+
+  download "$base_url" "$dest"
+  download "$part_url" "$dest"
+
+  # Resolve actual filenames on disk
+  local base_file part_file
+  base_file="$(ls -t "${dest}"/bitcoin-base*.tar.lz4 2>/dev/null | head -1)"
+  part_file="$(ls -t "${dest}"/bitcoin-part-*.tar.lz4 2>/dev/null | head -1)"
+
+  if [[ -z "$base_file" || -z "$part_file" ]]; then
+    echo "ERROR: Could not find all downloaded snapshot files in $dest" >&2
+    echo "  base : ${base_file:-<not found>}" >&2
+    echo "  part : ${part_file:-<not found>}" >&2
+    exit 1
+  fi
+
+  echo "==> Extracting base snapshot ..."
+  extract_lz4 "$base_file" "$dest"
+
+  echo "==> Extracting incremental snapshot ..."
+  extract_lz4 "$part_file" "$dest"
+
+  fix_ownership "$dest"
+}
+
 # ─── dispatch ─────────────────────────────────────────────────────────────────
 echo "=== download-snapshot: node=${NODE} type=${TYPE} extract_only=${EXTRACT_ONLY} data_root=${DATA_ROOT} ==="
 
@@ -709,6 +799,7 @@ case "$NODE" in
   polygon) do_polygon ;;
   bsc)     do_bsc ;;
   tron)    do_tron ;;
+  bitcoin) do_bitcoin ;;
 esac
 
 echo "=== Done ==="

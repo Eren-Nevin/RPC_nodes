@@ -1,0 +1,36 @@
+# Bitcoin Core Mainnet Snapshot
+# Updated: 2026-03-08
+#
+# ==============================================================================
+# PUBLICNODE SNAPSHOTS (Recommended - via aria2c)
+# ==============================================================================
+#
+# Bitcoin mainnet - TWO PARTS (base + incremental):
+# Part 1 (base): https://snapshots.publicnode.com/bitcoin-base.tar.lz4
+# Part 2 (incremental): https://snapshots.publicnode.com/bitcoin-part-943281.tar.lz4
+#
+# Download with aria2c (16 parallel connections, supports resume):
+#   aria2c -x 16 -s 16 -d /data/rpc_nodes/bitcoin-data/ "https://snapshots.publicnode.com/bitcoin-base.tar.lz4"
+#   aria2c -x 16 -s 16 -d /data/rpc_nodes/bitcoin-data/ "https://snapshots.publicnode.com/bitcoin-part-943281.tar.lz4"
+#
+# Extract (both parts to same directory):
+#   mkdir -p /data/rpc_nodes/bitcoin-data
+#   lz4 -dc /data/rpc_nodes/bitcoin-data/bitcoin-base.tar.lz4 | tar -xf - -C /data/rpc_nodes/bitcoin-data
+#   lz4 -dc /data/rpc_nodes/bitcoin-data/bitcoin-part-943281.tar.lz4 | tar -xf - -C /data/rpc_nodes/bitcoin-data
+#
+# ==============================================================================
+# STORAGE REQUIREMENTS
+# ==============================================================================
+#
+# Full node + txindex: ~730 GB (as of March 2026)
+# Pruned node (550 MB): ~5 GB
+#
+# ==============================================================================
+# ALTERNATIVE: INITIAL BLOCK DOWNLOAD (IBD)
+# ==============================================================================
+#
+# Just start the node and let it sync from genesis.
+# Takes 1-3 days depending on hardware/bandwidth.
+# This is the most trustless approach.
+#
+# ==============================================================================

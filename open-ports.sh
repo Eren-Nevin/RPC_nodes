@@ -27,6 +27,8 @@ ufw allow 30503/tcp comment 'polygon bor p2p'
 ufw allow 30503/udp comment 'polygon bor p2p'
 ufw allow 26656/tcp comment 'polygon heimdall p2p'
 
+# Bitcoin P2P
+ufw allow 8333/tcp  comment 'bitcoin p2p'
 
 echo "=== Current UFW status ==="
 ufw status verbose

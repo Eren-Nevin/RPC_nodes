@@ -1,0 +1,17 @@
+services:
+  bitcoind:
+    image: lncm/bitcoind:v28.1
+    container_name: bitcoin-node
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /data/rpc_nodes/bitcoin-data:/data/.bitcoin
+      - ./bitcoin.conf:/data/.bitcoin/bitcoin.conf:ro
+    command:
+      - -datadir=/data/.bitcoin
+      - -conf=/data/.bitcoin/bitcoin.conf
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
