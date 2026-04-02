@@ -1,15 +1,37 @@
 services:
   bitcoind:
-    image: lncm/bitcoind:v28.1
+    image: btcpayserver/bitcoin:30.2
     container_name: bitcoin-node
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /data/rpc_nodes/bitcoin-data:/data/.bitcoin
-      - ./bitcoin.conf:/data/.bitcoin/bitcoin.conf:ro
+      - /data/rpc_nodes/bitcoin-data:/data
+    environment:
+      BITCOIN_DATA: /data
+      BITCOIN_NETWORK: mainnet
+      BITCOIN_EXTRA_ARGS: |
+        server=1
+        rpcbind=0.0.0.0
+        rpcallowip=127.0.0.1/8
+        rpcallowip=172.16.0.0/12
+        rpcallowip=10.0.0.0/8
+        rpcport=8332
+        rpcauth=rpc:0e354b6e4ae830bed65bf7c3de584181$$8f55ec7f2d6f0692052e6f41e98f8eed9884d894e9c6e12b491611b718b1d63c
+        txindex=1
+        coinstatsindex=1
+        listen=1
+        port=8333
+        maxconnections=125
+        dbcache=4096
+        par=0
+        maxmempool=300
+        maxuploadtarget=1440
+        zmqpubrawblock=tcp://0.0.0.0:28332
+        zmqpubrawtx=tcp://0.0.0.0:28333
+        zmqpubhashblock=tcp://0.0.0.0:28332
+        zmqpubhashtx=tcp://0.0.0.0:28333
     command:
-      - -datadir=/data/.bitcoin
-      - -conf=/data/.bitcoin/bitcoin.conf
+      - bitcoind
     logging:
       driver: json-file
       options:
