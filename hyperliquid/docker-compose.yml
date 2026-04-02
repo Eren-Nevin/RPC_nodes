@@ -10,6 +10,19 @@ services:
     volumes:
       - /data/rpc_nodes/hyperliquid-data:/home/hluser/hl/data
 
+  event-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.event-server
+    container_name: hyperliquid-event-server
+    restart: unless-stopped
+    ports:
+      - "3002:3002"        # HTTP + WebSocket event API
+    volumes:
+      - /data/rpc_nodes/hyperliquid-data:/data/rpc_nodes/hyperliquid-data:ro
+    depends_on:
+      - node
+
   pruner:
     build: ./pruner
     container_name: hyperliquid-pruner
