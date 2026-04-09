@@ -23,8 +23,8 @@ for dir in "${EXCLUDES[@]}"; do
     PRUNE_ARGS+=(-path "*/$dir" -prune -o)
 done
 
-# Delete data older than 90 days
-MINUTES=$((60*24*90))
+# Delete data older than 24 hours
+MINUTES=$((60*24*1))
 find "$DATA_PATH" -mindepth 1 "${PRUNE_ARGS[@]}" -type f -mmin +$MINUTES -exec rm {} +
 
 size_after=$(du -sh "$DATA_PATH" | cut -f1)
