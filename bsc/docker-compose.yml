@@ -1,6 +1,6 @@
 services:
   geth:
-    image: ghcr.io/bnb-chain/bsc:1.6.7
+    image: ghcr.io/bnb-chain/bsc:1.7.3
     container_name: bsc-geth
     restart: unless-stopped
     network_mode: host

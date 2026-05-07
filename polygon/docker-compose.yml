@@ -1,6 +1,6 @@
 services:
   heimdall:
-    image: 0xpolygon/heimdall-v2:0.6.0
+    image: 0xpolygon/heimdall-v2:0.7.1-beta
     container_name: polygon-heimdall
     restart: unless-stopped
     network_mode: host
@@ -11,7 +11,7 @@ services:
       - --home=/heimdall-home
 
   bor:
-    image: 0xpolygon/bor:2.6.0
+    image: 0xpolygon/bor:2.7.2
     container_name: polygon-bor
     restart: unless-stopped
     network_mode: host
@@ -28,7 +28,7 @@ services:
       - --http
       - --http.addr=0.0.0.0
       - --http.port=8745
-      - --http.api=eth,net,web3,txpool,bor
+      - --http.api=eth,net,web3,txpool,bor,debug
       - --http.corsdomain=*
       - --http.vhosts=*
       - --ws
