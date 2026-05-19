@@ -1,0 +1,4 @@
+# Ignore every conf in this directory except the RPC node's own one.
+# New conf files (e.g. for unrelated services on this VPS) stay untracked.
+*.conf
+!rpc.defistream.dev.conf
