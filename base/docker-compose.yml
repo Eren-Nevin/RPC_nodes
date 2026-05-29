@@ -19,6 +19,9 @@ services:
       METRICS_PORT: "7301"
       DISCOVERY_PORT: "30403"
       P2P_PORT: "30403"
+      # Limit glibc arenas to reduce memory fragmentation; the binary is linked
+      # against glibc malloc and the default (8 * num_cores) leaks memory over time.
+      MALLOC_ARENA_MAX: "2"
 
   node:
     build:
