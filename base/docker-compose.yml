@@ -2,7 +2,7 @@ services:
   execution:
     build:
       context: ./base-node
-      dockerfile: reth/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     network_mode: host
     command: ["bash", "./execution-entrypoint"]
@@ -11,8 +11,8 @@ services:
     environment:
       RETH_CHAIN: base
       RETH_SEQUENCER_HTTP: https://mainnet-sequencer.base.org
-      OP_NODE_L2_ENGINE_AUTH: /tmp/engine-auth-jwt
-      OP_NODE_L2_ENGINE_AUTH_RAW: 688f5d737bad920bdfb2fc2f488d6b6209eebda1dae949a8de91398d932c517a
+      BASE_NODE_L2_ENGINE_AUTH: /tmp/engine-auth-jwt
+      BASE_NODE_L2_ENGINE_AUTH_RAW: 688f5d737bad920bdfb2fc2f488d6b6209eebda1dae949a8de91398d932c517a
       RPC_PORT: "8645"
       WS_PORT: "8646"
       AUTHRPC_PORT: "8551"
@@ -23,45 +23,45 @@ services:
   node:
     build:
       context: ./base-node
-      dockerfile: reth/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     network_mode: host
     depends_on:
       - execution
-    command: ["bash", "./op-node-entrypoint"]
+    command: ["bash", "./consensus-entrypoint"]
     environment:
-      # --- L1 endpoint: set OP_NODE_L1_ETH_RPC in .env ---
-      OP_NODE_L1_ETH_RPC: ${OP_NODE_L1_ETH_RPC}
-      OP_NODE_L1_BEACON: http://127.0.0.1:5052
-      OP_NODE_L1_BEACON_ARCHIVER: https://ethereum-beacon-api.publicnode.com
-      OP_NODE_L1_BEACON_FETCH_ALL_SIDECARS: "true"
-      OP_NODE_L1_RPC_KIND: basic
-      OP_NODE_L1_TRUST_RPC: "true"
+      # --- L1 endpoint: set BASE_NODE_L1_ETH_RPC in .env ---
+      BASE_NODE_L1_ETH_RPC: ${BASE_NODE_L1_ETH_RPC:-${OP_NODE_L1_ETH_RPC}}
+      BASE_NODE_L1_BEACON: http://127.0.0.1:5052
+      BASE_NODE_L1_BEACON_ARCHIVER: https://ethereum-beacon-api.publicnode.com
+      BASE_NODE_L1_BEACON_FETCH_ALL_SIDECARS: "true"
+      BASE_NODE_L1_RPC_KIND: basic
+      BASE_NODE_L1_TRUST_RPC: "true"
       # --- Network ---
-      OP_NODE_NETWORK: base-mainnet
-      OP_NODE_SYNCMODE: execution-layer
-      OP_NODE_VERIFIER_L1_CONFS: "4"
-      OP_NODE_ROLLUP_LOAD_PROTOCOL_VERSIONS: "true"
+      BASE_NODE_NETWORK: base
+      BASE_NODE_SYNCMODE: execution-layer
+      BASE_NODE_VERIFIER_L1_CONFS: "4"
+      BASE_NODE_ROLLUP_LOAD_PROTOCOL_VERSIONS: "true"
       # --- Engine API (shared JWT with execution) ---
-      OP_NODE_L2_ENGINE_KIND: reth
-      OP_NODE_L2_ENGINE_RPC: ws://127.0.0.1:8551
-      OP_NODE_L2_ENGINE_AUTH: /tmp/engine-auth-jwt
-      OP_NODE_L2_ENGINE_AUTH_RAW: 688f5d737bad920bdfb2fc2f488d6b6209eebda1dae949a8de91398d932c517a
+      BASE_NODE_L2_ENGINE_KIND: reth
+      BASE_NODE_L2_ENGINE_RPC: ws://127.0.0.1:8551
+      BASE_NODE_L2_ENGINE_AUTH: /tmp/engine-auth-jwt
+      BASE_NODE_L2_ENGINE_AUTH_RAW: 688f5d737bad920bdfb2fc2f488d6b6209eebda1dae949a8de91398d932c517a
       # --- P2P ---
-      OP_NODE_P2P_DISABLE: "false"
-      OP_NODE_P2P_AGENT: base
-      OP_NODE_P2P_LISTEN_IP: 0.0.0.0
-      OP_NODE_P2P_LISTEN_TCP_PORT: "9222"
-      OP_NODE_P2P_LISTEN_UDP_PORT: "9222"
-      OP_NODE_INTERNAL_IP: "true"
-      OP_NODE_P2P_BOOTNODES: "enr:-J24QNz9lbrKbN4iSmmjtnr7SjUMk4zB7f1krHZcTZx-JRKZd0kA2gjufUROD6T3sOWDVDnFJRvqBBo62zuF-hYCohOGAYiOoEyEgmlkgnY0gmlwhAPniryHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQKNVFlCxh_B-716tTs-h1vMzZkSs1FTu_OYTNjgufplG4N0Y3CCJAaDdWRwgiQG,enr:-J24QH-f1wt99sfpHy4c0QJM-NfmsIfmlLAMMcgZCUEgKG_BBYFc6FwYgaMJMQN5dsRBJApIok0jFn-9CS842lGpLmqGAYiOoDRAgmlkgnY0gmlwhLhIgb2Hb3BzdGFja4OFQgCJc2VjcDI1NmsxoQJ9FTIv8B9myn1MWaC_2lJ-sMoeCDkusCsk4BYHjjCq04N0Y3CCJAaDdWRwgiQG,enr:-J24QDXyyxvQYsd0yfsN0cRr1lZ1N11zGTplMNlW4xNEc7LkPXh0NAJ9iSOVdRO95GPYAIc6xmyoCCG6_0JxdL3a0zaGAYiOoAjFgmlkgnY0gmlwhAPckbGHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQJwoS7tzwxqXSyFL7g0JM-KWVbgvjfB8JA__T7yY_cYboN0Y3CCJAaDdWRwgiQG,enr:-J24QHmGyBwUZXIcsGYMaUqGGSl4CFdx9Tozu-vQCn5bHIQbR7On7dZbU61vYvfrJr30t0iahSqhc64J46MnUO2JvQaGAYiOoCKKgmlkgnY0gmlwhAPnCzSHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQINc4fSijfbNIiGhcgvwjsjxVFJHUstK9L1T8OTKUjgloN0Y3CCJAaDdWRwgiQG,enr:-J24QG3ypT4xSu0gjb5PABCmVxZqBjVw9ca7pvsI8jl4KATYAnxBmfkaIuEqy9sKvDHKuNCsy57WwK9wTt2aQgcaDDyGAYiOoGAXgmlkgnY0gmlwhDbGmZaHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQIeAK_--tcLEiu7HvoUlbV52MspE0uCocsx1f_rYvRenIN0Y3CCJAaDdWRwgiQG"
+      BASE_NODE_P2P_DISABLE: "false"
+      BASE_NODE_P2P_AGENT: base
+      BASE_NODE_P2P_LISTEN_IP: 0.0.0.0
+      BASE_NODE_P2P_ADVERTISE_TCP_PORT: "9222"
+      BASE_NODE_P2P_ADVERTISE_UDP_PORT: "9222"
+      BASE_NODE_P2P_INTERNAL_IP: "true"
+      BASE_NODE_P2P_BOOTNODES: "enr:-J24QNz9lbrKbN4iSmmjtnr7SjUMk4zB7f1krHZcTZx-JRKZd0kA2gjufUROD6T3sOWDVDnFJRvqBBo62zuF-hYCohOGAYiOoEyEgmlkgnY0gmlwhAPniryHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQKNVFlCxh_B-716tTs-h1vMzZkSs1FTu_OYTNjgufplG4N0Y3CCJAaDdWRwgiQG,enr:-J24QH-f1wt99sfpHy4c0QJM-NfmsIfmlLAMMcgZCUEgKG_BBYFc6FwYgaMJMQN5dsRBJApIok0jFn-9CS842lGpLmqGAYiOoDRAgmlkgnY0gmlwhLhIgb2Hb3BzdGFja4OFQgCJc2VjcDI1NmsxoQJ9FTIv8B9myn1MWaC_2lJ-sMoeCDkusCsk4BYHjjCq04N0Y3CCJAaDdWRwgiQG,enr:-J24QDXyyxvQYsd0yfsN0cRr1lZ1N11zGTplMNlW4xNEc7LkPXh0NAJ9iSOVdRO95GPYAIc6xmyoCCG6_0JxdL3a0zaGAYiOoAjFgmlkgnY0gmlwhAPckbGHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQJwoS7tzwxqXSyFL7g0JM-KWVbgvjfB8JA__T7yY_cYboN0Y3CCJAaDdWRwgiQG,enr:-J24QHmGyBwUZXIcsGYMaUqGGSl4CFdx9Tozu-vQCn5bHIQbR7On7dZbU61vYvfrJr30t0iahSqhc64J46MnUO2JvQaGAYiOoCKKgmlkgnY0gmlwhAPnCzSHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQINc4fSijfbNIiGhcgvwjsjxVFJHUstK9L1T8OTKUjgloN0Y3CCJAaDdWRwgiQG,enr:-J24QG3ypT4xSu0gjb5PABCmVxZqBjVw9ca7pvsI8jl4KATYAnxBmfkaIuEqy9sKvDHKuNCsy57WwK9wTt2aQgcaDDyGAYiOoGAXgmlkgnY0gmlwhDbGmZaHb3BzdGFja4OFQgCJc2VjcDI1NmsxoQIeAK_--tcLEiu7HvoUlbV52MspE0uCocsx1f_rYvRenIN0Y3CCJAaDdWRwgiQG"
       # --- RPC ---
-      OP_NODE_RPC_ADDR: 0.0.0.0
-      OP_NODE_RPC_PORT: "7545"
+      BASE_NODE_RPC_ADDR: 0.0.0.0
+      BASE_NODE_RPC_PORT: "7545"
       # --- Logging & metrics ---
-      OP_NODE_LOG_LEVEL: info
-      OP_NODE_LOG_FORMAT: json
-      OP_NODE_SNAPSHOT_LOG: /tmp/op-node-snapshot-log
-      OP_NODE_METRICS_ENABLED: "true"
-      OP_NODE_METRICS_ADDR: 0.0.0.0
-      OP_NODE_METRICS_PORT: "7300"
+      BASE_NODE_LOG_LEVEL: info
+      BASE_NODE_LOG_FORMAT: json
+      BASE_NODE_LOG_VERBOSITY: "3"
+      BASE_NODE_METRICS_ENABLED: "true"
+      BASE_NODE_METRICS_ADDR: 0.0.0.0
+      BASE_NODE_METRICS_PORT: "7300"

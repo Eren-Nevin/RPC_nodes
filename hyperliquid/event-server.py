@@ -179,23 +179,35 @@ class FileTailer:
 
                 size = path.stat().st_size
                 if size > pos:
-                    with open(path) as f:
+                    with open(path, "rb") as f:
                         f.seek(pos)
-                        new_data = f.read()
-                        pos = f.tell()
-                    for line in new_data.splitlines():
-                        if line.strip():
-                            msg = json.dumps({
-                                "type": self.event_type,
-                                "data": json.loads(line),
-                            })
-                            dead = set()
-                            for q in self.subscribers:
-                                try:
-                                    q.put_nowait(msg)
-                                except asyncio.QueueFull:
-                                    dead.add(q)
-                            self.subscribers -= dead
+                        new_data = f.read(size - pos)
+                    # Only advance past complete lines; partial trailing data
+                    # is left for the next read so hl-node can finish writing it.
+                    last_nl = new_data.rfind(b"\n")
+                    if last_nl == -1:
+                        await asyncio.sleep(0.1)
+                        continue
+                    complete = new_data[: last_nl + 1]
+                    pos += len(complete)
+                    for line in complete.decode("utf-8", errors="replace").splitlines():
+                        if not line.strip():
+                            continue
+                        try:
+                            data = json.loads(line)
+                        except json.JSONDecodeError as e:
+                            logger.warning(
+                                f"[{self.event_type}] skipping malformed line: {e}"
+                            )
+                            continue
+                        msg = json.dumps({"type": self.event_type, "data": data})
+                        dead = set()
+                        for q in self.subscribers:
+                            try:
+                                q.put_nowait(msg)
+                            except asyncio.QueueFull:
+                                dead.add(q)
+                        self.subscribers -= dead
                 elif size < pos:
                     pos = 0
 
