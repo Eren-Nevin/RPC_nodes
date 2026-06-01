@@ -1,0 +1,11 @@
+# Periodic restart of base-execution to recycle memory leaked by glibc malloc.
+# Install with:
+#   sudo install -o root -g root -m 644 base/base-execution-restart.cron \
+#       /etc/cron.d/base-execution-restart
+#
+# Schedule: every 6 hours (00:00, 06:00, 12:00, 18:00 UTC). The cron.d format
+# requires a user field, hence "mvp" between the schedule and the command.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 0,6,12,18 * * * mvp /home/mvp/Running/RPC_nodes/base/restart-execution.sh
