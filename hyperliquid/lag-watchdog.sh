@@ -13,7 +13,7 @@
 set -eu
 
 LOG=/var/log/hl-lag-watchdog.log
-THRESHOLD_MIN=10                          # restart if lag > this many minutes
+THRESHOLD_MIN=30                          # restart if lag > this many minutes
 COOLDOWN_FILE=/tmp/hl-lag-watchdog.cooldown
 COOLDOWN_SEC=1800                         # 30 min: covers state-sync + catchup
 

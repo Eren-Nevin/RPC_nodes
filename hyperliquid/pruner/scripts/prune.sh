@@ -1,8 +1,11 @@
 #!/bin/bash
 DATA_PATH="/home/hluser/hl/data"
 
-# Folders to exclude from pruning (keep forever)
-EXCLUDES=("visor_child_stderr" "evm_block_and_receipts")
+# Folders to exclude from pruning (keep forever).
+# Only visor_child_stderr (tiny, kept for crash debugging). Everything else,
+# including evm_block_and_receipts, is pruned to the retention window below
+# since historical data is backfilled from S3.
+EXCLUDES=("visor_child_stderr")
 
 echo "$(date): Prune script started" >> /proc/1/fd/1
 
@@ -23,9 +26,16 @@ for dir in "${EXCLUDES[@]}"; do
     PRUNE_ARGS+=(-path "*/$dir" -prune -o)
 done
 
-# Delete data older than 24 hours
-MINUTES=$((60*24*1))
+# Delete data older than 4 hours. Widened from 2h (2026-07-04) to keep enough
+# replica_cmds/abci_states for the node to self-recover after a restart instead
+# of forcing a slow/failing full network state re-sync. Backfill from S3 for older.
+MINUTES=$((60*4))
 find "$DATA_PATH" -mindepth 1 "${PRUNE_ARGS[@]}" -type f -mmin +$MINUTES -exec rm {} +
+
+# Remove empty dated subdirectories left behind after their files are pruned.
+# -mindepth 2 keeps the top-level data folders (replica_cmds, etc.) intact;
+# the node recreates dated subdirs as needed.
+find "$DATA_PATH" -mindepth 2 -type d -empty -mmin +$MINUTES -delete 2>/dev/null
 
 size_after=$(du -sh "$DATA_PATH" | cut -f1)
 files_after=$(find "$DATA_PATH" -type f | wc -l)

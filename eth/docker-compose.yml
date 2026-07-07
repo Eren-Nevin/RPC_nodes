@@ -48,3 +48,8 @@ services:
       - --http-port=5052
       - --port=9100
       - --discovery-port=9100
+      # PeerDAS supernode: custody all 128 data columns so the beacon API can
+      # reconstruct/serve blobs to consumers (e.g. Base op-node derivation).
+      # Without this a full node only custodies ~4 columns and cannot rebuild
+      # the 64 needed -> /eth/v1/beacon/blobs returns 500.
+      - --supernode

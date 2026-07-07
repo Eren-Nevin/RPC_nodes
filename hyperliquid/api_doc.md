@@ -75,6 +75,30 @@ curl "http://localhost:3002/fills/latest?n=10"
 
 ---
 
+### GET /fills/since?block={N}
+
+Returns all fill blocks with `block_number >= N` from the last 12 hours of hourly files. The response is guaranteed contiguous — every block from `N` (or the first available block `>= N`) up to the chain head is included. Same array shape as `/fills/latest`.
+
+```bash
+curl "http://localhost:3002/fills/since?block=1030140000"
+```
+
+- **200** — JSON array of block objects (possibly empty `[]` if `N` is ahead of the current chain head — normal polling steady state).
+- **400** — missing or non-integer `block` param.
+- **404 (predates window)** — `N` is older than the oldest block on disk.
+  ```json
+  {"error": "block N predates 12h retention window", "oldest_block": <int>}
+  ```
+- **404 (gap)** — on-disk data has a hole that includes a block in `[N, head]`. Caller should reset their cursor to `next_available_block` and accept the gap.
+  ```json
+  {"error": "block N is missing from on-disk data (gap)",
+   "missing_block": <int>,
+   "next_available_block": <int|null>,
+   "oldest_block": <int>}
+  ```
+
+---
+
 ### GET /misc?date={YYYYMMDD}&hour={H}
 
 Returns all misc events for a specific hour.
@@ -116,6 +140,16 @@ Returns the last N block lines from the current hour's misc event file. Default:
 
 ```bash
 curl "http://localhost:3002/misc/latest?n=10"
+```
+
+---
+
+### GET /misc/since?block={N}
+
+Returns all misc-event blocks with `block_number >= N` from the last 12 hours of hourly files. The response is guaranteed contiguous (one entry per block in `[N, head]`, including blocks with empty `events`). Same array shape as `/misc/latest`. Same status codes as `/fills/since` above — including the **404 (gap)** response with `missing_block` / `next_available_block` when data is non-contiguous.
+
+```bash
+curl "http://localhost:3002/misc/since?block=1030140000"
 ```
 
 ---

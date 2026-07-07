@@ -1,6 +1,6 @@
 services:
   heimdall:
-    image: 0xpolygon/heimdall-v2:0.7.1-beta
+    image: 0xpolygon/heimdall-v2:0.9.0
     container_name: polygon-heimdall
     restart: unless-stopped
     network_mode: host
@@ -17,6 +17,11 @@ services:
     network_mode: host
     depends_on:
       - heimdall
+    environment:
+      # Soft heap cap so bor's Go runtime GCs and returns memory to the OS instead of
+      # climbing to ~100 GB over weeks (set 2026-07-04). Soft limit — bor can exceed it
+      # transiently to avoid OOM, but GCs aggressively to stay near it.
+      - GOMEMLIMIT=50GiB
     volumes:
       - /data/rpc_nodes/polygon-data/bor:/bor-home
     command:

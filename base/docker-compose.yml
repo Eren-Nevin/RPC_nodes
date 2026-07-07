@@ -35,13 +35,23 @@ services:
     environment:
       # --- L1 endpoint: set BASE_NODE_L1_ETH_RPC in .env ---
       BASE_NODE_L1_ETH_RPC: ${BASE_NODE_L1_ETH_RPC:-${OP_NODE_L1_ETH_RPC}}
-      BASE_NODE_L1_BEACON: http://127.0.0.1:5052
-      BASE_NODE_L1_BEACON_ARCHIVER: https://ethereum-beacon-api.publicnode.com
+      # L1 beacon (blob source). Defaults to the local L1 lighthouse, which MUST run
+      # as a PeerDAS supernode (--supernode) to reconstruct/serve blobs post-Fulu.
+      # INITIAL SYNC FROM AN OLD SNAPSHOT: the snapshot's L1 origin may be older than
+      # your lighthouse's data-column custody window, so blob reconstruction 500s and
+      # derivation stalls. Set BASE_NODE_L1_BEACON to a blob-archive endpoint (e.g.
+      # https://ethereum-beacon-api.publicnode.com) in .env until caught up, then unset.
+      BASE_NODE_L1_BEACON: ${BASE_NODE_L1_BEACON:-http://127.0.0.1:5052}
+      BASE_NODE_L1_BEACON_ARCHIVER: ${BASE_NODE_L1_BEACON_ARCHIVER:-https://ethereum-beacon-api.publicnode.com}
       BASE_NODE_L1_BEACON_FETCH_ALL_SIDECARS: "true"
       BASE_NODE_L1_RPC_KIND: basic
       BASE_NODE_L1_TRUST_RPC: "true"
       # --- Network ---
       BASE_NODE_NETWORK: base
+      # execution-layer: op-node drives reth to snap-sync the chain, then validates
+      # via derivation. Requires base-node >= v1.1.0 (reth 2.x) — older builds fail to
+      # issue the forkchoiceUpdated that sets reth's sync target and deadlock on a
+      # large snapshot gap. See README "Upgrading / known issues".
       BASE_NODE_SYNCMODE: execution-layer
       BASE_NODE_VERIFIER_L1_CONFS: "4"
       BASE_NODE_ROLLUP_LOAD_PROTOCOL_VERSIONS: "true"

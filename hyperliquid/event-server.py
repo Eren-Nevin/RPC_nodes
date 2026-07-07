@@ -9,8 +9,10 @@ Reads from the hl-node's local files:
 HTTP endpoints:
   GET /fills?date=YYYYMMDD&hour=H          — returns all fills for that hour
   GET /fills/latest?n=100                   — returns the last N fill lines from current file
+  GET /fills/since?block=N                  — returns blocks with block_number >= N from last 12h
   GET /misc?date=YYYYMMDD&hour=H           — returns all misc events for that hour
   GET /misc/latest?n=100                    — returns the last N misc event lines from current file
+  GET /misc/since?block=N                   — returns blocks with block_number >= N from last 12h
   GET /health                               — health check
 
 WebSocket endpoints:
@@ -31,7 +33,7 @@ import json
 import os
 import sys
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sanic import Sanic, response
@@ -42,6 +44,7 @@ app = Sanic("hl-event-server")
 DATA_ROOT = os.environ.get("HL_DATA_ROOT", "/data/rpc_nodes/hyperliquid-data")
 FILLS_DIR = "node_fills_by_block/hourly"
 MISC_DIR = "misc_events_by_block/hourly"
+SINCE_WINDOW_HOURS = 12
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
@@ -61,6 +64,81 @@ def read_file_lines(path: Path) -> list[str]:
         return []
     with open(path) as f:
         return f.readlines()
+
+
+def _collect_since(event_type: str, block: int, hours: int) -> tuple[list[dict], int | None, dict | None]:
+    """Walk the last `hours` hour-files and return blocks with block_number >= block.
+
+    Returns (events, oldest_block_in_window, error).
+    - events: contiguous list of block objects, block.. <= max_in_window, in order
+    - oldest_block_in_window: smallest block_number observed in the window (None if window empty)
+    - error: None on success; otherwise a dict describing why the request can't be honored:
+        {"kind": "predates_window", "oldest_block": N}
+        {"kind": "gap", "missing_block": N, "next_available_block": M | None, "oldest_block": N}
+    """
+    now = datetime.now(timezone.utc)
+    paths = []
+    for i in range(hours - 1, -1, -1):
+        t = now - timedelta(hours=i)
+        paths.append(event_file_path(event_type, t.strftime("%Y%m%d"), str(t.hour)))
+
+    # Walk every file, deduplicating by block_number (adjacent files can overlap
+    # after a node restart — last writer wins).
+    matching: dict[int, dict] = {}
+    min_bn: int | None = None
+    max_bn: int | None = None
+
+    for path in paths:
+        if not path.exists():
+            continue
+        with open(path) as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                bn = obj.get("block_number")
+                if bn is None:
+                    continue
+                if min_bn is None or bn < min_bn:
+                    min_bn = bn
+                if max_bn is None or bn > max_bn:
+                    max_bn = bn
+                if bn >= block:
+                    matching[bn] = obj
+
+    if min_bn is None:
+        # Window is completely empty (no files exist or all were unparseable).
+        return [], None, None
+
+    if block < min_bn:
+        return [], min_bn, {"kind": "predates_window", "oldest_block": min_bn}
+
+    if block > max_bn:
+        # Caller is ahead of our data (normal polling steady state).
+        return [], min_bn, None
+
+    # Verify contiguous coverage from `block` to `max_bn` — any missing block_number
+    # means our data has a gap and we can't honor the >= block contract.
+    out: list[dict] = []
+    expected = block
+    while expected <= max_bn:
+        obj = matching.get(expected)
+        if obj is None:
+            # Find the next available block after the gap so the caller can resume.
+            next_available = min((k for k in matching if k > expected), default=None)
+            return [], min_bn, {
+                "kind": "gap",
+                "missing_block": expected,
+                "next_available_block": next_available,
+                "oldest_block": min_bn,
+            }
+        out.append(obj)
+        expected += 1
+
+    return out, min_bn, None
 
 
 def tail_lines(path: Path, n: int) -> list[str]:
@@ -123,6 +201,38 @@ async def get_fills_latest(request):
     return response.json(events)
 
 
+def _since_response(event_type: str, request):
+    raw = request.args.get("block")
+    if raw is None:
+        return response.json({"error": "block param required (integer)"}, status=400)
+    try:
+        block = int(raw)
+    except ValueError:
+        return response.json({"error": "block param must be an integer"}, status=400)
+    events, oldest, error = _collect_since(event_type, block, SINCE_WINDOW_HOURS)
+    if error is not None:
+        if error["kind"] == "predates_window":
+            return response.json(
+                {"error": f"block {block} predates {SINCE_WINDOW_HOURS}h retention window",
+                 "oldest_block": error["oldest_block"]},
+                status=404,
+            )
+        if error["kind"] == "gap":
+            return response.json(
+                {"error": f"block {error['missing_block']} is missing from on-disk data (gap)",
+                 "missing_block": error["missing_block"],
+                 "next_available_block": error["next_available_block"],
+                 "oldest_block": error["oldest_block"]},
+                status=404,
+            )
+    return response.json(events)
+
+
+@app.get("/fills/since")
+async def get_fills_since(request):
+    return _since_response("fills", request)
+
+
 @app.get("/misc")
 async def get_misc(request):
     date = request.args.get("date")
@@ -145,6 +255,11 @@ async def get_misc_latest(request):
     lines = tail_lines(path, n)
     events = [json.loads(line) for line in lines if line.strip()]
     return response.json(events)
+
+
+@app.get("/misc/since")
+async def get_misc_since(request):
+    return _since_response("misc", request)
 
 
 # ─── WebSocket tail ──────────────────────────────────────────────────────────

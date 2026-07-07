@@ -1,4 +1,5 @@
 #!/bin/bash
+# # Schedule: every 4h via /etc/cron.d/base-execution-restart
 # Periodic restart of base-execution to reclaim memory leaked by glibc malloc.
 # base-reth-node grows to ~90 GiB after ~17h despite MALLOC_ARENA_MAX=2 and
 # engine cache limits, eventually starving the host and triggering hl-visor's
