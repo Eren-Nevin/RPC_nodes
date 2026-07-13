@@ -9,6 +9,10 @@ services:
       - "4002:4002"        # P2P gossip
     volumes:
       - /data/rpc_nodes/hyperliquid-data:/home/hluser/hl/data
+      # Persist hyperliquid_data (visor_abci_state.json + db_hub/evm_db) so a node
+      # restart recovers from local state instead of a fragile P2P re-sync that
+      # depends on peer availability (added 2026-07-13 after a ~52min re-sync outage).
+      - /data/rpc_nodes/hyperliquid-hlstate:/home/hluser/hl/hyperliquid_data
 
   event-server:
     build:
