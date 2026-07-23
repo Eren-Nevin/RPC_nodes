@@ -26,10 +26,12 @@ for dir in "${EXCLUDES[@]}"; do
     PRUNE_ARGS+=(-path "*/$dir" -prune -o)
 done
 
-# Delete data older than 4 hours. Widened from 2h (2026-07-04) to keep enough
-# replica_cmds/abci_states for the node to self-recover after a restart instead
-# of forcing a slow/failing full network state re-sync. Backfill from S3 for older.
-MINUTES=$((60*4))
+# Delete data older than 12 hours. 2h(2026-07-04)->4h->12h(2026-07-23): keep enough
+# replica_cmds/abci_states that the visor can self-recover LOCALLY (replay from a
+# retained periodic_abci_state) after a restart, instead of the fragile/slow full
+# NETWORK re-sync (abci_stream) that repeatedly caused multi-hour outages when peers
+# were flaky. 12h of HL data is ~150G (disk has ample room). Backfill older from S3.
+MINUTES=$((60*12))
 find "$DATA_PATH" -mindepth 1 "${PRUNE_ARGS[@]}" -type f -mmin +$MINUTES -exec rm {} +
 
 # Remove empty dated subdirectories left behind after their files are pruned.

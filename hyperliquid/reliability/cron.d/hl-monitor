@@ -1,0 +1,5 @@
+# HL health monitor — every 1 min. Detects stalls, Telegram-alerts, auto-recovers.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+TZ=UTC
+* * * * * root /home/mvp/Running/RPC_nodes/hyperliquid/reliability/hl-monitor.sh >/dev/null 2>&1

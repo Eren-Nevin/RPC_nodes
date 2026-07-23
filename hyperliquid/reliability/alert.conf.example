@@ -1,0 +1,10 @@
+# Telegram alert credentials for the HL reliability monitor.
+# Copy this file to `alert.conf` (which is gitignored) and fill in your values.
+#
+#   1. Create a bot: message @BotFather on Telegram -> /newbot -> copy the token.
+#   2. Get your chat id: message @userinfobot -> it replies with your numeric id.
+#      (or start a chat with your new bot, then visit
+#       https://api.telegram.org/bot<TOKEN>/getUpdates and read chat.id)
+#
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
