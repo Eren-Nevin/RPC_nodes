@@ -12,7 +12,7 @@ STATE=/var/lib/hl-monitor; mkdir -p "$STATE"
 LASTF="$STATE/lastfills"; STALLC="$STATE/stallcount"; DOWN="$STATE/alerted_down"; LAGA="$STATE/alerted_lag"; COOL="$STATE/recover_cooldown"
 
 STALL_LIMIT=4         # consecutive minutes with no data production = a real stall
-LAG_WARN=20           # minutes; warn (not restart) if producing but this far behind
+LAG_WARN=10           # minutes; warn (not restart) if producing but this far behind
 COOLDOWN_SEC=2400     # 40 min minimum between auto-recoveries
 
 # Container not even running? -> hard down, try compose up, alert.

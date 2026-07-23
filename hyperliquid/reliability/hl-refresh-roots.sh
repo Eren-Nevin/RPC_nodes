@@ -23,7 +23,7 @@ try:
     live=json.load(urllib.request.urlopen(req,timeout=10))
 except Exception as e:
     print("ERROR fetching gossipRootIps:",e); sys.exit(1)
-ips=list(dict.fromkeys([str(x) for x in live]+OPERATORS))   # dedupe, keep order
+ips=sorted(set([str(x) for x in live]+OPERATORS))   # dedupe + SORT (stable file, no daily git noise)
 d=json.load(open(cfg))
 old=len(d.get("root_node_ips",[]))
 d["root_node_ips"]=[{"Ip":ip} for ip in ips]
