@@ -28,7 +28,8 @@ docker compose up -d --force-recreate --no-deps node >>"$LOG" 2>&1
 # Reset the monitor's re-sync bookkeeping: the state dir just went back to empty, so the
 # next tick must measure growth from 0 and start the RESYNC_MAX_MIN clock fresh for THIS
 # attempt — otherwise a stale reading makes the guard mis-judge the new re-sync.
-rm -f /var/lib/hl-monitor/statebytes /var/lib/hl-monitor/resync_since
+rm -f /var/lib/hl-monitor/statebytes /var/lib/hl-monitor/resync_since \
+      /var/lib/hl-monitor/state_last_growth
 
 nroots=$(python3 -c 'import json;print(len(json.load(open("'"$HLDIR"'/override_gossip_config.json"))["root_node_ips"]))' 2>/dev/null)
 log "=== hl-recover restart issued (${nroots} roots) ==="

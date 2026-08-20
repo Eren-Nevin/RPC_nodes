@@ -10,12 +10,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/lib.sh"
 STATE=/var/lib/hl-monitor; mkdir -p "$STATE"
 LASTF="$STATE/lastfills"; STALLC="$STATE/stallcount"; DOWN="$STATE/alerted_down"; LAGA="$STATE/alerted_lag"; COOL="$STATE/recover_cooldown"
-STATEB="$STATE/statebytes"; RESYNC="$STATE/resync_since"
+STATEB="$STATE/statebytes"; RESYNC="$STATE/resync_since"; GREW="$STATE/state_last_growth"
 
 STALL_LIMIT=4         # consecutive minutes with no data production = a real stall
 LAG_WARN=10           # minutes; warn (not restart) if producing but this far behind
 COOLDOWN_SEC=2400     # 40 min minimum between auto-recoveries
 RESYNC_MAX_MIN=120    # give an in-flight re-sync this long before overriding the guard
+GROWTH_GRACE_SEC=900  # treat "grew within this long" as still making progress
 
 # Container not even running? -> hard down, try compose up, alert.
 if ! hl_running; then
@@ -26,10 +27,16 @@ fi
 
 # Sample the state-db size EVERY tick (cheap), so "is it growing?" always compares
 # against the previous minute rather than a stale reading from the last stall.
+nowts=$(date +%s)
 sb=$(hl_state_bytes); sbprev=$(cat "$STATEB" 2>/dev/null || echo 0)
 [ -n "$sb" ] && echo "$sb" > "$STATEB"
+{ [ -n "$sb" ] && [ "$sb" -gt "$sbprev" ]; } 2>/dev/null && echo "$nowts" > "$GREW"
+# "Progressing" = the state db grew at some point recently, not necessarily in THIS tick.
+# While catching up, HL applies in bursts (a peer connects, streams a batch, drops), so a
+# single quiet tick is normal and must not be read as wedged — that released the guard at
+# exactly the wrong moment on 2026-08-20 and discarded 8.8GB of already-synced state.
 state_growing=0
-{ [ -n "$sb" ] && [ "$sb" -gt "$sbprev" ]; } 2>/dev/null && state_growing=1
+[ $(( nowts - $(cat "$GREW" 2>/dev/null || echo 0) )) -lt "$GROWTH_GRACE_SEC" ] && state_growing=1
 
 fills=$(hl_fills_block); fills=${fills:-0}
 last=$(cat "$LASTF" 2>/dev/null || echo 0)
@@ -70,7 +77,7 @@ if [ "$state_growing" = 1 ] || hl_downloading; then
   held=$(( (now - $(cat "$RESYNC")) / 60 ))
   if [ "$held" -lt "$RESYNC_MAX_MIN" ]; then
     if [ ! -f "$DOWN" ]; then
-      notify "🔄 RE-SYNCING — HL not producing for ${stall}min but state is still growing ($(( ${sb:-0}/1073741824 ))GB). Holding off recovery so it can finish."
+      notify "🔄 WORKING — HL not producing for ${stall}min but state is still growing ($(( ${sb:-0}/1073741824 ))GB): re-syncing or catching up. Holding off recovery so it can finish."
       touch "$DOWN"
     fi
     log "stall=${stall} but re-sync in progress (${held}min, state=${sb:-?}B) -> recovery suppressed"

@@ -23,8 +23,12 @@ hl_fills_block(){  # latest fill block number, 0 on empty/glitch
   curl -s -m6 'http://127.0.0.1:3002/fills/latest?n=1' 2>/dev/null \
     | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[-1].get("block_number") if isinstance(d,list) and d else 0)' 2>/dev/null
 }
-hl_applying(){  # 0/true if an "applied block" log appeared in the last 20s
-  docker logs hyperliquid-node --since 20s 2>&1 | grep -qE 'applied block [0-9]+'
+hl_applying(){  # 0/true if an "applied block" log appeared since about the last tick
+  # 70s, not 20s: the monitor ticks every 60s, and while catching up HL applies in bursts
+  # (a peer connects, streams a batch, drops). A 20s window samples a third of the interval
+  # and misses the gaps, so a node that IS applying reads as stalled and the stall counter
+  # creeps toward a needless recovery. Cover the whole gap between ticks, with margin.
+  docker logs hyperliquid-node --since 70s 2>&1 | grep -qE 'applied block [0-9]+'
 }
 hl_child_restarts(){  # hl-node child restart counter (crash-loop indicator)
   docker logs hyperliquid-node 2>&1 | grep -oE 'n_restarts: [0-9]+' | tail -1 | grep -oE '[0-9]+'
