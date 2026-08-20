@@ -39,3 +39,15 @@ hl_lag_min(){  # chain head vs latest local fill, in minutes; 999 on API glitch
   if [ -n "$chain" ] && [ "$chain" != "0" ] && [ -n "$lc" ]; then echo $(( (chain-lc)/60000 )); else echo 999; fi
 }
 hl_running(){ docker ps --filter name=hyperliquid-node --filter status=running -q | grep -q . ; }
+
+# --- re-sync progress probes ---
+# A state re-sync legitimately produces NO blocks for many minutes: the node streams a
+# ~1GB abci "greeting" from a peer, then ingests it into the state db (log goes silent
+# while it does, so logs alone can't see it). If the monitor fires another clean-slate
+# recovery during that window it throws the progress away and starts from zero — which
+# is exactly what turned one outage into three recovery cycles on 2026-08-20.
+HLSTATE_DIR=/data/rpc_nodes/hyperliquid-hlstate
+hl_state_bytes(){ du -sb "$HLSTATE_DIR" 2>/dev/null | cut -f1; }   # ~10ms, ~850 files
+hl_downloading(){  # streaming the greeting / handshaking with a state-server peer
+  docker logs hyperliquid-node --since 150s 2>&1 | grep -qE 'abci_stream|abci greeting|abci state'
+}

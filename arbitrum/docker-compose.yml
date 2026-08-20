@@ -1,6 +1,9 @@
 services:
   arbitrum:
-    image: offchainlabs/nitro-node:v3.9.4-7f582c3
+    # v3.9.4 -> v3.11.3 (2026-08-20): Arbitrum One activated ArbOS 52 and v3.9.4's upgrade
+    # switch stops at ArbOS 51, so it hard-failed every block with "the chain is upgrading
+    # to unsupported ArbOS version 52" and stopped advancing. v3.11.3 handles 52-61.
+    image: offchainlabs/nitro-node:v3.11.3-beb2108
     container_name: arbitrum-one
     restart: unless-stopped
     network_mode: host

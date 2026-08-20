@@ -10,10 +10,12 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/lib.sh"
 STATE=/var/lib/hl-monitor; mkdir -p "$STATE"
 LASTF="$STATE/lastfills"; STALLC="$STATE/stallcount"; DOWN="$STATE/alerted_down"; LAGA="$STATE/alerted_lag"; COOL="$STATE/recover_cooldown"
+STATEB="$STATE/statebytes"; RESYNC="$STATE/resync_since"
 
 STALL_LIMIT=4         # consecutive minutes with no data production = a real stall
 LAG_WARN=10           # minutes; warn (not restart) if producing but this far behind
 COOLDOWN_SEC=2400     # 40 min minimum between auto-recoveries
+RESYNC_MAX_MIN=120    # give an in-flight re-sync this long before overriding the guard
 
 # Container not even running? -> hard down, try compose up, alert.
 if ! hl_running; then
@@ -21,6 +23,13 @@ if ! hl_running; then
   (cd /home/mvp/Running/RPC_nodes/hyperliquid && docker compose up -d --no-deps node) >>"$LOG" 2>&1
   exit 0
 fi
+
+# Sample the state-db size EVERY tick (cheap), so "is it growing?" always compares
+# against the previous minute rather than a stale reading from the last stall.
+sb=$(hl_state_bytes); sbprev=$(cat "$STATEB" 2>/dev/null || echo 0)
+[ -n "$sb" ] && echo "$sb" > "$STATEB"
+state_growing=0
+{ [ -n "$sb" ] && [ "$sb" -gt "$sbprev" ]; } 2>/dev/null && state_growing=1
 
 fills=$(hl_fills_block); fills=${fills:-0}
 last=$(cat "$LASTF" 2>/dev/null || echo 0)
@@ -31,7 +40,7 @@ producing=0
 [ "$fills" -gt 0 ] && echo "$fills" > "$LASTF"
 
 if [ "$producing" = 1 ]; then
-  echo 0 > "$STALLC"
+  echo 0 > "$STALLC"; rm -f "$RESYNC"
   if [ -f "$DOWN" ]; then notify "✅ RECOVERED — HL applying again (fills=$fills, lag=${lag}min)"; rm -f "$DOWN"; fi
   # soft lag warning while healthy (deduped): only when API gave a real number
   if [ "$lag" != 999 ] && [ "$lag" -ge "$LAG_WARN" ] 2>/dev/null; then
@@ -48,11 +57,34 @@ stall=$(( $(cat "$STALLC" 2>/dev/null || echo 0) + 1 )); echo "$stall" > "$STALL
 
 # real stall
 nr=$(hl_child_restarts)
+now=$(date +%s)
+
+# --- re-sync guard ---
+# If the node is mid-re-sync (streaming the greeting, or silently ingesting it — the
+# state db keeps growing), it is NOT stuck: it is working and just can't produce blocks
+# yet. Firing hl-recover.sh here wipes the state dir and restarts the download from
+# zero, so a slow-but-healthy re-sync never finishes. Hold off until it lands, or until
+# RESYNC_MAX_MIN proves it really is wedged.
+if [ "$state_growing" = 1 ] || hl_downloading; then
+  [ -f "$RESYNC" ] || echo "$now" > "$RESYNC"
+  held=$(( (now - $(cat "$RESYNC")) / 60 ))
+  if [ "$held" -lt "$RESYNC_MAX_MIN" ]; then
+    if [ ! -f "$DOWN" ]; then
+      notify "🔄 RE-SYNCING — HL not producing for ${stall}min but state is still growing ($(( ${sb:-0}/1073741824 ))GB). Holding off recovery so it can finish."
+      touch "$DOWN"
+    fi
+    log "stall=${stall} but re-sync in progress (${held}min, state=${sb:-?}B) -> recovery suppressed"
+    exit 0
+  fi
+  notify "⏱️ RE-SYNC STUCK — ${held}min without producing despite activity. Overriding guard, forcing recovery."
+  rm -f "$RESYNC"
+fi
+
 if [ ! -f "$DOWN" ]; then
   notify "🔴 DOWN — HL not producing for ${stall}min (fills stuck=$fills, lag=${lag}min, child_restarts=${nr}). Auto-recovery starting."
   touch "$DOWN"
 fi
-now=$(date +%s); lastrec=$(cat "$COOL" 2>/dev/null || echo 0)
+lastrec=$(cat "$COOL" 2>/dev/null || echo 0)
 if [ $((now-lastrec)) -ge "$COOLDOWN_SEC" ]; then
   echo "$now" > "$COOL"
   log "stall=${stall} -> triggering hl-recover.sh"
