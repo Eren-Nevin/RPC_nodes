@@ -5,7 +5,6 @@
 set -uo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/lib.sh"
-HLDIR=/home/mvp/Running/RPC_nodes/hyperliquid
 
 log "=== hl-recover START ==="
 notify "🔧 RECOVERY started — HL stalled; freeing resources + clean re-sync"
@@ -19,9 +18,9 @@ docker rm -f base-execution-1 base-node-1 polygon-bor polygon-heimdall >/dev/nul
 # 3. Clean-slate re-sync: stop node, clear stale/corrupt state mount, rebuild+recreate.
 cd "$HLDIR" || { log "ERROR cd $HLDIR"; exit 1; }
 docker compose stop node >>"$LOG" 2>&1
-rm -rf /data/rpc_nodes/hyperliquid-hlstate
-mkdir -p /data/rpc_nodes/hyperliquid-hlstate
-chown 10000:10000 /data/rpc_nodes/hyperliquid-hlstate
+rm -rf "$HLSTATE_DIR"
+mkdir -p "$HLSTATE_DIR"
+chown 10000:10000 "$HLSTATE_DIR"
 docker compose build node >>"$LOG" 2>&1
 docker compose up -d --force-recreate --no-deps node >>"$LOG" 2>&1
 

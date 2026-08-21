@@ -37,12 +37,11 @@ Built 2026-07-23 after repeated stuck-resync outages (see `../TROUBLESHOOTING.md
 | `hl-recover.sh` | full clean-slate recovery (no-contention → fresh roots → re-sync) |
 | `hl-refresh-roots.sh` | refresh `override_gossip_config.json` roots from live API |
 | `alert.conf(.example)` | Telegram bot token + chat id (gitignored) |
-| `cron.d/` | copies of the installed `/etc/cron.d/` entries |
+| `cron.d/` | cron **templates** (`__RELDIR__` placeholder) — installed by `install.sh`, not copied by hand |
 
 ## Install on a fresh host
 ```bash
 cp alert.conf.example alert.conf   # fill in TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
-sudo touch /var/log/hl-monitor.log && sudo chmod 666 /var/log/hl-monitor.log
-sudo cp cron.d/hl-monitor cron.d/hl-roots-refresh /etc/cron.d/
+sudo ./install.sh    # creates the log + state dir, installs both cron jobs
 ```
 Manual recovery any time: `sudo ./hl-recover.sh`. Test alert: `source lib.sh && notify "test"`.

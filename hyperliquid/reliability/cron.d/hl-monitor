@@ -2,4 +2,4 @@
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TZ=UTC
-* * * * * root /home/mvp/Running/RPC_nodes/hyperliquid/reliability/hl-monitor.sh >/dev/null 2>&1
+* * * * * root __RELDIR__/hl-monitor.sh >/dev/null 2>&1

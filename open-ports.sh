@@ -30,5 +30,11 @@ ufw allow 26656/tcp comment 'polygon heimdall p2p'
 # Bitcoin P2P
 ufw allow 8333/tcp  comment 'bitcoin p2p'
 
+# Hyperliquid P2P gossip — REQUIRED. The node bootstraps its consensus state by
+# streaming ~1GB from gossip peers; if these are unreachable it cannot re-sync and
+# falls into the stuck-resync loop documented in hyperliquid/TROUBLESHOOTING.md.
+ufw allow 4001/tcp comment 'hyperliquid p2p gossip'
+ufw allow 4002/tcp comment 'hyperliquid p2p gossip'
+
 echo "=== Current UFW status ==="
 ufw status verbose

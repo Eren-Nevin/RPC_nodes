@@ -8,7 +8,7 @@
 set -uo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/lib.sh"
-CFG=/home/mvp/Running/RPC_nodes/hyperliquid/override_gossip_config.json
+CFG="$HLDIR/override_gossip_config.json"
 
 python3 - "$CFG" <<'PY' 2>>"$LOG"
 import json,sys,urllib.request

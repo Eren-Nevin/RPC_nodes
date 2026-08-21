@@ -23,7 +23,7 @@ echo "Setting ownership to 1000:1000..."
 sudo chown -R 1000:1000 /data/rpc_nodes/eth-data/
 
 echo "Starting Ethereum node..."
-cd /home/mvp/Running/RPC_nodes/eth
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 docker compose up -d
 
 echo ""

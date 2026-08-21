@@ -8,11 +8,11 @@ services:
       - "4001:4001"        # P2P gossip
       - "4002:4002"        # P2P gossip
     volumes:
-      - /data/rpc_nodes/hyperliquid-data:/home/hluser/hl/data
+      - ${DATA_ROOT:-/data/rpc_nodes}/hyperliquid-data:/home/hluser/hl/data
       # Persist hyperliquid_data (visor_abci_state.json + db_hub/evm_db) so a node
       # restart recovers from local state instead of a fragile P2P re-sync that
       # depends on peer availability (added 2026-07-13 after a ~52min re-sync outage).
-      - /data/rpc_nodes/hyperliquid-hlstate:/home/hluser/hl/hyperliquid_data
+      - ${DATA_ROOT:-/data/rpc_nodes}/hyperliquid-hlstate:/home/hluser/hl/hyperliquid_data
 
   event-server:
     build:
@@ -23,7 +23,7 @@ services:
     ports:
       - "3002:3002"        # HTTP + WebSocket event API
     volumes:
-      - /data/rpc_nodes/hyperliquid-data:/data/rpc_nodes/hyperliquid-data:ro
+      - ${DATA_ROOT:-/data/rpc_nodes}/hyperliquid-data:/data/rpc_nodes/hyperliquid-data:ro
     depends_on:
       - node
 
@@ -32,4 +32,4 @@ services:
     container_name: hyperliquid-pruner
     restart: unless-stopped
     volumes:
-      - /data/rpc_nodes/hyperliquid-data:/home/hluser/hl/data
+      - ${DATA_ROOT:-/data/rpc_nodes}/hyperliquid-data:/home/hluser/hl/data

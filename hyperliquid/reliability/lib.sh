@@ -1,6 +1,10 @@
 #!/bin/bash
 # Shared helpers for the HL reliability scripts (monitor / recover / refresh-roots).
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Repo layout is <repo>/hyperliquid/reliability/, so the compose dir is one level up.
+# Derived, never hardcoded: these scripts must work wherever the repo is checked out.
+HLDIR="$(cd "$DIR/.." && pwd)"
+DATA_ROOT="${DATA_ROOT:-/data/rpc_nodes}"
 LOG=/var/log/hl-monitor.log
 # Telegram creds (gitignored). Copy alert.conf.example -> alert.conf and fill in.
 [ -f "$DIR/alert.conf" ] && source "$DIR/alert.conf"
@@ -58,7 +62,7 @@ hl_running(){ local out; out=$(docker ps --filter name=hyperliquid-node --filter
 # while it does, so logs alone can't see it). If the monitor fires another clean-slate
 # recovery during that window it throws the progress away and starts from zero — which
 # is exactly what turned one outage into three recovery cycles on 2026-08-20.
-HLSTATE_DIR=/data/rpc_nodes/hyperliquid-hlstate
+HLSTATE_DIR="${DATA_ROOT}/hyperliquid-hlstate"
 hl_state_bytes(){ du -sb "$HLSTATE_DIR" 2>/dev/null | cut -f1; }   # ~10ms, ~850 files
 hl_downloading(){  # streaming the greeting / handshaking with a state-server peer
   local out; out=$(docker logs hyperliquid-node --since 150s 2>&1) || true

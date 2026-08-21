@@ -44,6 +44,9 @@ before blaming I/O for an HL problem.
 
 ## Initial Setup
 
+> Standing this up on a **new server**? See [`deploy.md`](deploy.md) for a from-scratch
+> runbook covering ETH, Arbitrum and Hyperliquid.
+
 ```bash
 # 1. Clone with submodules
 git clone --recurse-submodules https://github.com/Eren-Nevin/RPC_nodes.git
@@ -613,8 +616,7 @@ curl -s http://localhost:3002/health
 ```bash
 cd hyperliquid/reliability
 cp alert.conf.example alert.conf     # fill in TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
-sudo touch /var/log/hl-monitor.log && sudo chmod 666 /var/log/hl-monitor.log
-sudo cp cron.d/hl-monitor cron.d/hl-roots-refresh /etc/cron.d/
+sudo ./install.sh    # creates the log + state dir, installs both cron jobs
 ```
 
 - `hl-monitor.sh` — every minute; ground truth is "is HL producing data". Alerts and
@@ -810,6 +812,7 @@ Installed copies live in `/etc/cron.d/`; the tracked originals are:
 
 | Doc | Covers |
 |-----|--------|
+| `deploy.md` | From-scratch deployment of ETH, Arbitrum and Hyperliquid on a new server |
 | `base/README.md` | Base deploy, snapshot restore, PeerDAS blobs, known issues |
 | `hyperliquid/TROUBLESHOOTING.md` | HL stuck-resync diagnosis and recovery playbook |
 | `hyperliquid/reliability/README.md` | HL monitoring, auto-recovery and alerting |

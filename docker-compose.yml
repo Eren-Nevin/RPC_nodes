@@ -4,9 +4,9 @@ services:
     container_name: rpc-init
     restart: "no"
     environment:
-      DATA_ROOT: /data/rpc_nodes
+      DATA_ROOT: ${DATA_ROOT:-/data/rpc_nodes}
     volumes:
-      - /data:/data
+      - ${DATA_ROOT:-/data/rpc_nodes}:${DATA_ROOT:-/data/rpc_nodes}
       - ./init-data-dirs.sh:/init-data-dirs.sh:ro
     command: sh /init-data-dirs.sh
 

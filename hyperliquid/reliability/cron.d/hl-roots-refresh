@@ -3,4 +3,4 @@
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TZ=UTC
-30 4 * * * root /home/mvp/Running/RPC_nodes/hyperliquid/reliability/hl-refresh-roots.sh >/dev/null 2>&1
+30 4 * * * root __RELDIR__/hl-refresh-roots.sh >/dev/null 2>&1

@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /data/rpc_nodes/eth-data/reth:/root/.local/share/reth/mainnet
+      - ${DATA_ROOT:-/data/rpc_nodes}/eth-data/reth:/root/.local/share/reth/mainnet
       - ./jwt.hex:/jwt.hex:ro
     command:
       - node
@@ -34,7 +34,7 @@ services:
     depends_on:
       - reth
     volumes:
-      - /data/rpc_nodes/eth-data/lighthouse:/root/.lighthouse
+      - ${DATA_ROOT:-/data/rpc_nodes}/eth-data/lighthouse:/root/.lighthouse
       - ./jwt.hex:/jwt.hex:ro
     command:
       - lighthouse

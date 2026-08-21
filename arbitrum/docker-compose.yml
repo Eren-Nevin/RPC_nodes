@@ -8,10 +8,10 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /data/rpc_nodes/arbitrum:/home/user/.arbitrum
+      - ${DATA_ROOT:-/data/rpc_nodes}/arbitrum:/home/user/.arbitrum
     command:
       - --chain.id=42161
-      - --parent-chain.connection.url=${L1_RPC_URL}
+      - --parent-chain.connection.url=${L1_RPC_URL:?set L1_RPC_URL in arbitrum/.env (copy .env.example)}
       - --parent-chain.blob-client.beacon-url=${L1_BEACON_URL:-https://ethereum-beacon-api.publicnode.com}
       - --node.staker.enable=false
       - --http.api=net,web3,eth,debug

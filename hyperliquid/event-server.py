@@ -66,6 +66,85 @@ def read_file_lines(path: Path) -> list[str]:
         return f.readlines()
 
 
+def _line_obj(line):
+    """Parse one JSONL line -> (block_number, obj), or (None, None) if unusable."""
+    try:
+        obj = json.loads(line)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None, None
+    bn = obj.get("block_number")
+    return (bn, obj) if isinstance(bn, int) else (None, None)
+
+
+def _tail_chunk(path: Path, size: int, want: int = 65536) -> bytes:
+    with open(path, "rb") as f:
+        f.seek(max(0, size - want))
+        return f.read()
+
+
+# Completed hour-files never change again, so their block range is memoised on
+# (size, mtime). Only the current hour is re-read, and only when it has grown.
+_range_cache: dict[str, tuple[int, float, int | None, int | None]] = {}
+
+
+def _file_bn_range(path: Path) -> tuple[int | None, int | None]:
+    """(first, last) block_number in a file, read from its head and tail only.
+
+    Never reads the body — a 400 MB hour-file costs two small reads, not a full parse.
+    """
+    try:
+        st = path.stat()
+    except OSError:
+        return None, None
+    key = str(path)
+    hit = _range_cache.get(key)
+    if hit is not None and hit[0] == st.st_size and hit[1] == st.st_mtime:
+        return hit[2], hit[3]
+
+    first = last = None
+    with open(path, "rb") as f:
+        for line in f:
+            first, _ = _line_obj(line)
+            if first is not None:
+                break
+    if first is not None:
+        # Last complete line wins; a partial trailing line simply fails to parse.
+        for line in reversed(_tail_chunk(path, st.st_size).split(b"\n")):
+            last, _ = _line_obj(line)
+            if last is not None:
+                break
+    _range_cache[key] = (st.st_size, st.st_mtime, first, last)
+    return first, last
+
+
+def _scan_start_offset(path: Path, size: int, target: int) -> int:
+    """A line-aligned offset at or before the first line with block_number >= target.
+
+    block_number is append-ordered, so this binary-searches the file by byte offset
+    instead of parsing from the start. Only ever advances past lines it has proven
+    are below `target`, so the answer is never skipped.
+    """
+    lo, hi, best = 0, size, 0
+    with open(path, "rb") as f:
+        while lo < hi:
+            mid = (lo + hi) // 2
+            f.seek(mid)
+            if mid:
+                f.readline()          # discard the partial line we landed inside
+            start = f.tell()
+            line = f.readline()
+            if not line:
+                hi = mid
+                continue
+            bn, _ = _line_obj(line)
+            if bn is not None and bn < target:
+                best = start + len(line)
+                lo = best
+            else:
+                hi = mid
+    return best
+
+
 def _collect_since(event_type: str, block: int, hours: int) -> tuple[list[dict], int | None, dict | None]:
     """Walk the last `hours` hour-files and return blocks with block_number >= block.
 
@@ -75,6 +154,8 @@ def _collect_since(event_type: str, block: int, hours: int) -> tuple[list[dict],
     - error: None on success; otherwise a dict describing why the request can't be honored:
         {"kind": "predates_window", "oldest_block": N}
         {"kind": "gap", "missing_block": N, "next_available_block": M | None, "oldest_block": N}
+
+    Blocking and CPU-bound — callers must run it off the event loop (see _since_response).
     """
     now = datetime.now(timezone.utc)
     paths = []
@@ -82,36 +163,23 @@ def _collect_since(event_type: str, block: int, hours: int) -> tuple[list[dict],
         t = now - timedelta(hours=i)
         paths.append(event_file_path(event_type, t.strftime("%Y%m%d"), str(t.hour)))
 
-    # Walk every file, deduplicating by block_number (adjacent files can overlap
-    # after a node restart — last writer wins).
-    matching: dict[int, dict] = {}
-    min_bn: int | None = None
-    max_bn: int | None = None
-
+    # Cheap pass: every file's block range from its head and tail, so the window
+    # bounds are known without parsing gigabytes.
+    ranges = []
     for path in paths:
         if not path.exists():
             continue
-        with open(path) as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                bn = obj.get("block_number")
-                if bn is None:
-                    continue
-                if min_bn is None or bn < min_bn:
-                    min_bn = bn
-                if max_bn is None or bn > max_bn:
-                    max_bn = bn
-                if bn >= block:
-                    matching[bn] = obj
+        first_bn, last_bn = _file_bn_range(path)
+        if first_bn is None or last_bn is None:
+            continue
+        ranges.append((path, first_bn, last_bn))
 
-    if min_bn is None:
+    if not ranges:
         # Window is completely empty (no files exist or all were unparseable).
         return [], None, None
+
+    min_bn = min(r[1] for r in ranges)
+    max_bn = max(r[2] for r in ranges)
 
     if block < min_bn:
         return [], min_bn, {"kind": "predates_window", "oldest_block": min_bn}
@@ -119,6 +187,27 @@ def _collect_since(event_type: str, block: int, hours: int) -> tuple[list[dict],
     if block > max_bn:
         # Caller is ahead of our data (normal polling steady state).
         return [], min_bn, None
+
+    # Expensive pass: read only the files that can hold blocks >= `block`, and only
+    # the tail of the first such file. Oldest -> newest so that on an overlap
+    # (adjacent files can repeat blocks after a node restart) the newest file wins.
+    matching: dict[int, dict] = {}
+    for path, first_bn, last_bn in ranges:
+        if last_bn < block:
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        start = _scan_start_offset(path, size, block) if first_bn < block else 0
+        file_map: dict[int, dict] = {}
+        with open(path, "rb") as f:
+            f.seek(start)
+            for line in f:
+                bn, obj = _line_obj(line)
+                if bn is not None and bn >= block:
+                    file_map[bn] = obj
+        matching.update(file_map)
 
     # Verify contiguous coverage from `block` to `max_bn` — any missing block_number
     # means our data has a gap and we can't honor the >= block contract.
@@ -201,7 +290,7 @@ async def get_fills_latest(request):
     return response.json(events)
 
 
-def _since_response(event_type: str, request):
+async def _since_response(event_type: str, request):
     raw = request.args.get("block")
     if raw is None:
         return response.json({"error": "block param required (integer)"}, status=400)
@@ -209,7 +298,13 @@ def _since_response(event_type: str, request):
         block = int(raw)
     except ValueError:
         return response.json({"error": "block param must be an integer"}, status=400)
-    events, oldest, error = _collect_since(event_type, block, SINCE_WINDOW_HOURS)
+    # _collect_since is blocking and CPU-bound. Sanic runs single_process, so calling
+    # it inline froze the whole server for the length of a multi-GB scan — /health and
+    # every other route hung and the process sat at 100% CPU until restarted.
+    loop = asyncio.get_running_loop()
+    events, oldest, error = await loop.run_in_executor(
+        None, _collect_since, event_type, block, SINCE_WINDOW_HOURS
+    )
     if error is not None:
         if error["kind"] == "predates_window":
             return response.json(
@@ -230,7 +325,7 @@ def _since_response(event_type: str, request):
 
 @app.get("/fills/since")
 async def get_fills_since(request):
-    return _since_response("fills", request)
+    return await _since_response("fills", request)
 
 
 @app.get("/misc")
@@ -259,7 +354,7 @@ async def get_misc_latest(request):
 
 @app.get("/misc/since")
 async def get_misc_since(request):
-    return _since_response("misc", request)
+    return await _since_response("misc", request)
 
 
 # ─── WebSocket tail ──────────────────────────────────────────────────────────

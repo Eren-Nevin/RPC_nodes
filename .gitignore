@@ -14,3 +14,7 @@ Thumbs.db
 # Logs
 *.log
 hyperliquid/reliability/alert.conf
+
+# Python
+__pycache__/
+*.pyc

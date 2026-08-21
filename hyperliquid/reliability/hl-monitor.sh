@@ -21,7 +21,7 @@ GROWTH_GRACE_SEC=900  # treat "grew within this long" as still making progress
 # Container not even running? -> hard down, try compose up, alert.
 if ! hl_running; then
   if [ ! -f "$DOWN" ]; then notify "🔴 DOWN — hyperliquid-node container not running. Starting it."; touch "$DOWN"; fi
-  (cd /home/mvp/Running/RPC_nodes/hyperliquid && docker compose up -d --no-deps node) >>"$LOG" 2>&1
+  (cd "$HLDIR" && docker compose up -d --no-deps node) >>"$LOG" 2>&1
   exit 0
 fi
 
