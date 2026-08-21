@@ -5,7 +5,7 @@
 #   ./download-snapshot -n <node> [-t full|pruned] [-x] [-d <data-root>]
 #
 # Options:
-#   -n  Node name (required): eth | arb | base | polygon | bsc | tron
+#   -n  Node name (required): eth | arb | base | polygon | bsc | tron | bitcoin
 #   -t  Snapshot type: full (default) | pruned
 #   -x  Extract-only mode: scan data dir for already-downloaded files and extract them
 #   -d  Override data root (default: /data/rpc_nodes)

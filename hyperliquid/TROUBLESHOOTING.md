@@ -6,7 +6,7 @@ Signs:
 - Node logs loop on: `could not load VisorAbciState ... missing file`, `abci_stream ... deadline has elapsed`,
   `could not read abci state ... early eof`, `error connecting to candidate peer ... Peer full`.
 - `docker stats hyperliquid-node` shows low CPU (idle, network-waiting) and MEM stuck low (~50 MiB = state not loaded).
-- Lag (chain head vs latest fill) grows; the lag-watchdog may fire.
+- Lag (chain head vs latest fill) grows; `hl-monitor.sh` warns and, on a true stall, auto-recovers.
 
 ## Root cause (learned 2026-07-13, ~11h outage)
 The node bootstraps its gossip/state peers from `root_node_ips` in **`override_gossip_config.json`**
@@ -25,7 +25,8 @@ never got enough live gossip blocks to stay at the tip. It was **block-starved**
 2. Put **all** of those (plus HL's dedicated operator roots — ASXN / B-Harvest / Nansen / Hypurrscan,
    listed in https://github.com/hyperliquid-dex/node README) into `override_gossip_config.json`
    `root_node_ips`, and bump `n_gossip_peers` (we use **16**). Keep `try_new_peers: true`.
-   (Current committed config has 37 roots — refresh it from `gossipRootIps` if this recurs.)
+   (`reliability/hl-refresh-roots.sh` does exactly this daily via cron — 39 roots as of
+   2026-08-21 — so run it rather than hand-editing: `sudo reliability/hl-refresh-roots.sh`.)
 3. Apply: `docker compose build node && docker compose up -d --force-recreate --no-deps node`
    (the `hyperliquid_data` mount persists state across the recreate — see below).
 Result: with enough healthy state-servers to choose from, the node loaded **local** state and caught
@@ -34,11 +35,17 @@ up (~29 blk/s) to the tip in minutes.
 ## Recovery playbook / do's & don'ts
 - **DON'T restart repeatedly.** Each restart resets an in-progress state download and re-triggers the
   fragile P2P re-sync. If it's mid-`recv greeting: N/993…` download, leave it — let it finish.
-- **DON'T let the watchdog thrash it** while it's grinding. Temporarily disable, then re-enable when healthy:
+- **DON'T let the monitor thrash it** while it's grinding. `hl-monitor.sh` has a re-sync guard
+  (it holds off recovery while the state db is growing, up to `RESYNC_MAX_MIN`), so this is
+  normally handled — but if you are recovering by hand and want it out of the way entirely,
+  disable and re-enable the cron:
   ```bash
-  sudo mv /etc/cron.d/hl-lag-watchdog /etc/cron.d/hl-lag-watchdog.disabled   # disable
-  sudo mv /etc/cron.d/hl-lag-watchdog.disabled /etc/cron.d/hl-lag-watchdog   # re-enable when at tip
+  sudo mv /etc/cron.d/hl-monitor /etc/cron.d/hl-monitor.disabled   # disable
+  sudo mv /etc/cron.d/hl-monitor.disabled /etc/cron.d/hl-monitor   # re-enable when at tip
   ```
+  Watch what it is doing with `tail -f /var/log/hl-monitor.log`.
+  (The old `lag-watchdog.sh` this replaced restarted on transient lag and *caused* re-syncs; it
+  was deleted 2026-08-21. See `reliability/README.md`.)
 - **First** widen the gossip roots (above) — that's the highest-leverage fix for the stuck-resync loop.
 - If the node has been **down a long time** (state stale), the visor deletes `visor_abci_state.json` and
   forces a full network re-sync — expect it; the roots fix is what lets that re-sync actually complete.
