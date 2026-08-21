@@ -6,10 +6,10 @@ services:
     volumes:
       - /data/rpc_nodes/tron-data:/java-tron/output-directory
     ports:
-      - "8190:8090"        # HTTP RPC
-      - "50051:50051"      # gRPC
-      - "18888:18888"      # P2P TCP
-      - "18888:18888/udp"  # P2P UDP
+      - "127.0.0.1:8190:8090"  # HTTP RPC
+      - "127.0.0.1:50051:50051" # gRPC
+      - "18888:18888"           # P2P TCP
+      - "18888:18888/udp"       # P2P UDP
     command:
       - -c
       - /java-tron/config.conf

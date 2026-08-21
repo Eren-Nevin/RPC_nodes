@@ -11,7 +11,7 @@ services:
       BITCOIN_NETWORK: mainnet
       BITCOIN_EXTRA_ARGS: |
         server=1
-        rpcbind=0.0.0.0
+        rpcbind=127.0.0.1
         rpcallowip=127.0.0.1/8
         rpcallowip=172.16.0.0/12
         rpcallowip=10.0.0.0/8
@@ -26,10 +26,10 @@ services:
         par=0
         maxmempool=300
         maxuploadtarget=1440
-        zmqpubrawblock=tcp://0.0.0.0:28332
-        zmqpubrawtx=tcp://0.0.0.0:28333
-        zmqpubhashblock=tcp://0.0.0.0:28332
-        zmqpubhashtx=tcp://0.0.0.0:28333
+        zmqpubrawblock=tcp://127.0.0.1:28332
+        zmqpubrawtx=tcp://127.0.0.1:28333
+        zmqpubhashblock=tcp://127.0.0.1:28332
+        zmqpubhashtx=tcp://127.0.0.1:28333
     command:
       - bitcoind
     logging:
