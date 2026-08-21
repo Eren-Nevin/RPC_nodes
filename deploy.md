@@ -20,7 +20,7 @@ is only about getting them running somewhere new.
 |-------|-------------|-------------------|---------------------|
 | Ethereum L1 (Reth + Lighthouse) | ~1.9 TB | ~2.4 TB | ~34 GB |
 | Arbitrum One (Nitro) | ~6.4 TB | ~2.8 TB | ~12 GB |
-| Hyperliquid (hl-visor) | ~310 GB @ 12 h retention | none — streams from peers | ~21 GB |
+| Hyperliquid (hl-visor) | ~290 GB @ 12 h retention | **none — streams from peers** | ~21 GB |
 
 - **NVMe, not spinning disk, and ideally not shared.** Hyperliquid is the sensitive one; the
   history in this repo is a string of outages caused by other chains' I/O starving it.
@@ -144,9 +144,10 @@ upgrade the pinned image *before* an activation lands.
 
 ## 5. Hyperliquid
 
-The most involved of the three, and the one with no snapshot: it bootstraps by streaming
-~1 GB of consensus state from gossip peers. Read
-[`hyperliquid/TROUBLESHOOTING.md`](hyperliquid/TROUBLESHOOTING.md) before you need it.
+The hard one, and the only chain here with **no snapshot**. It bootstraps by streaming a
+~1.09 GB consensus-state "greeting" from a gossip peer and then ingesting it. That transfer is
+the single most fragile step in this repo and the source of every HL outage to date. Read
+[`hyperliquid/TROUBLESHOOTING.md`](hyperliquid/TROUBLESHOOTING.md) before you need it, not after.
 
 ### 5.1 Start the node
 
@@ -162,6 +163,11 @@ Three containers come up:
 | `hyperliquid-node` | `hl-visor run-non-validator` — EVM RPC + Info API on 3001, P2P on 4001/4002 |
 | `hyperliquid-event-server` | Sanic app on 3002 serving fills / misc events over HTTP + WS |
 | `hyperliquid-pruner` | hourly cron enforcing the 12-hour retention window |
+
+The build downloads `hl-visor` from `binaries.hyperliquid.xyz` and **GPG-verifies it** against
+the Hyperliquid signing key (fingerprint `CF2C 2EA3 DC3E 8F04 2A55 FB65 0325 4A93 49F1 820B`);
+the build fails closed if the signature does not check out. Verified working from a clean
+`--no-cache` build on 2026-08-21.
 
 The gossip bootstrap peers are baked into the image from `override_gossip_config.json` at
 **build** time, so changing that file requires `docker compose build node` followed by
@@ -183,40 +189,87 @@ cron jobs with this checkout's path substituted in. The tracked files under `rel
 are **templates** containing a `__RELDIR__` placeholder — do not copy them to `/etc/cron.d`
 directly, or cron will run a path that does not exist on this host.
 
-Installed jobs:
-
 | Job | Schedule | Purpose |
 |-----|----------|---------|
 | `hl-monitor` | every minute | Detect stalls, alert, auto-recover — with a guard that holds off while a re-sync is legitimately in flight |
 | `hl-roots-refresh` | 04:30 UTC daily | Repopulate gossip roots from the live API so a re-sync always has healthy state-servers |
 
-### 5.3 Verify
+> **While you are deliberately bootstrapping or testing by hand, turn the monitor off.** It will
+> otherwise fire `hl-recover.sh` mid-download, wipe the state mount and restart the transfer
+> from zero:
+> ```bash
+> sudo mv /etc/cron.d/hl-monitor /etc/cron.d/hl-monitor.disabled   # off
+> sudo mv /etc/cron.d/hl-monitor.disabled /etc/cron.d/hl-monitor   # on, once at tip
+> ```
+
+### 5.3 What a healthy first sync looks like
+
+```bash
+docker logs -f hyperliquid-node
+```
+
+Expect, in order: gossip config loaded → `using local AbciState: missing` (correct on a fresh
+node — there is nothing local yet) → `connecting to peer` → `reading bytes for abci_stream recv
+greeting: N/1089239448` climbing to completion → memory climbing to ~21 GB as the state is
+ingested → `applied block` lines.
+
+**It produces no blocks at all for 30–70 minutes.** That is normal, not a stall. Memory sitting
+at ~300 MB–2 GB means the state is not loaded yet; ~21 GB means it is.
+
+Then verify:
 
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://localhost:3001/evm
 curl -s -X POST -H 'Content-Type: application/json' \
   -d '{"type":"exchangeStatus"}' http://localhost:3001/info
-curl -s http://localhost:3002/health
-tail -f /var/log/hl-monitor.log
+curl -s http://localhost:3002/health          # must answer in milliseconds, not hang
 ```
 
-First sync takes **30–70 minutes** and produces no blocks the whole time. That is normal.
+### 5.4 When the bootstrap will not complete
 
-### 5.4 The rules that matter
+Observed in production on 2026-08-21, all three in one afternoon:
+
+| Log line | Meaning |
+|----------|---------|
+| `error connecting to candidate peer Ip(x): Peer full` | Every root is at capacity. The node cycles candidates every ~6 s. |
+| `could not read abci state from x: early eof`<br>`abci_stream from x timed out: deadline has elapsed` | A peer accepted, started the ~1.09 GB transfer, then dropped it. The progress counter **restarts from zero** against a new peer. |
+| `panicked at nv_stream.rs:311: too many blocks to request` | The node fell so far behind that the gap exceeded what `nv_stream` will request. The visor restarts the child, which then has no local AbciState and needs a full re-sync — a loop that feeds itself. |
+
+**Check your own host first, in this order** — all of these were ruled out before concluding the
+problem was upstream:
+
+```bash
+iostat -x 5 2                      # disk util and read latency on the data array
+uptime; nproc                      # load vs core count
+cat /sys/class/net/<iface>/speed   # link speed, vs actual RX in /sys/.../rx_bytes
+sudo ufw status                    # 4001/4002 must be open if UFW is enabled
+python3 -c "import json;print(len(json.load(open('override_gossip_config.json'))['root_node_ips']))"
+curl -s -X POST -H 'Content-Type: application/json' \
+  --data '{"type":"gossipRootIps"}' https://api.hyperliquid.xyz/info   # compare against the above
+```
+
+If disk is idle, load is low, the link is far from saturated, the P2P ports are reachable and
+the roots match the live API, then the transfer is being dropped **peer-side** and there is no
+local fix. Retrying is the only lever — successful bootstraps do happen between failures. Budget
+hours on a bad day, and do not restart the node repeatedly while you wait; each restart discards
+whatever the current attempt had downloaded.
+
+### 5.5 The rules that matter
 
 - **Do not restart it because it looks stuck.** Each restart discards an in-progress state
   download and re-triggers the fragile re-sync. Check `/var/log/hl-monitor.log` first.
-- **`/health` must answer.** The monitor's ground truth reads
-  `http://127.0.0.1:3002/fills/latest` from the event-server. If that server is wedged, the
-  monitor silently degrades to a weaker fallback and its lag numbers become meaningless.
+- **`/health` must answer in milliseconds.** The monitor's ground truth reads
+  `http://127.0.0.1:3002/fills/latest` from the event-server (`reliability/lib.sh`). If that
+  server is slow or wedged, the monitor's probes time out, its lag numbers become unreliable and
+  it silently falls back to a weaker check. Treat a slow `/health` as a monitoring outage.
 - **Keep the storage uncontended.** Running heavy chains on the same disks is what knocked HL
   over repeatedly in 2026.
-- Retention is 12 hours (`pruner/scripts/prune.sh`). Shortening it means a restarted node
-  cannot replay locally and is forced into the network re-sync — the exact thing you want to
-  avoid. Historical data is backfilled from S3, not kept on disk.
-
----
+- Retention is 12 hours (`pruner/scripts/prune.sh`). Shortening it means a restarted node cannot
+  replay locally and is forced into the network re-sync — the exact thing you want to avoid.
+  Historical data is backfilled from S3, not kept on disk.
+- **`hl-visor` cannot be version-pinned.** It is closed-source, Ubuntu-24.04-only, and
+  auto-updates `hl-node` at runtime.
 
 ## 6. Public exposure with nginx (optional)
 
@@ -266,4 +319,21 @@ Ports in use: **8555/8556/5052** (ETH), **8547/8548** (Arbitrum), **3001/3002** 
 - **`open-ports.sh` only adds rules; it does not enable UFW,** and it does not cover chains
   beyond those listed. Check `sudo ufw status` afterwards.
 - **The nginx vhost is not parameterised** — domain and certificate paths are edited by hand
-  (step 6).
+  (step 6). Routes for chains that are not running return 502 until they are.
+- **Hyperliquid's bootstrap is not guaranteed to succeed on any given attempt.** Everything on
+  this host's side is verified working (see below); completion depends on a gossip peer serving
+  the full state transfer without dropping it. See [5.4](#54-when-the-bootstrap-will-not-complete).
+
+## What has been verified
+
+Checked directly rather than assumed, on 2026-08-21:
+
+| | |
+|---|---|
+| `docker compose run --rm init` on a fresh `DATA_ROOT` | creates every directory, including `hyperliquid-hlstate` |
+| Directory ownership | Hyperliquid `10000:10000`, all others `1000:1000` |
+| `DATA_ROOT` override | all mounts relocate; container-side paths unchanged |
+| `docker compose build --no-cache node` | succeeds from clean, GPG signature good |
+| `docker compose config` | valid for all nine chains |
+| Reliability scripts | no hardcoded paths; `install.sh` reproduces the previously installed cron lines byte-for-byte |
+| Event-server `/health` and `/fills/since` | answer in milliseconds, including during a concurrent full-window scan |

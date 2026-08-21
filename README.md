@@ -19,7 +19,7 @@ they can be brought back, but do not assume a directory here means a live node.
 |-------|-----------|--------|----------|--------------|
 | Ethereum L1 | Reth + Lighthouse | ✅ **running**, synced | 8555 | 1.9 TB |
 | Arbitrum One | Nitro | ✅ **running**, synced | 8547 | 6.4 TB |
-| Hyperliquid | hl-visor + pruner + event-server | ✅ **running**, at tip | 3001 / 3002 | 236 GB + 24 GB state |
+| Hyperliquid | hl-visor + pruner + event-server | ❌ **off**, data deleted 2026-08-21 | 3001 / 3002 | — |
 | BSC | Geth | ⏸️ **stopped** (was synced) | 8845 | 7.1 TB (retained) |
 | Base (OP Stack) | op-reth + base-consensus | ❌ **off**, data deleted | 8645 | — |
 | Polygon PoS | Bor + Heimdall | ❌ **off**, data deleted | 8745 | — |
@@ -27,6 +27,20 @@ they can be brought back, but do not assume a directory here means a live node.
 | Bitcoin | Bitcoin Core | ❌ never deployed | 8332 | — |
 
 Host array `/dev/md1` is 28 TB, ~59% used.
+
+### Why Hyperliquid is off
+
+Removed on 2026-08-21 (318 GB freed) — the node is being redeployed on a separate server. It had
+been stuck in a bootstrap loop that was **not** caused by anything on this host: disk sat at 8%
+utilisation, load was low on 64 cores, the 1 Gbit link was carrying 11 MB/s, P2P 4001/4002 were
+reachable and the gossip roots matched the live API. Gossip peers were accepting the ~1.09 GB
+state transfer and then dropping it (`early eof`, `deadline has elapsed`), and once the node fell
+far enough behind it panicked with `nv_stream.rs: too many blocks to request`, which restarted
+the child with no local state and began the cycle again.
+
+The crons are disabled (`/etc/cron.d/hl-monitor.disabled`, `hl-roots-refresh.disabled`) so the
+monitor cannot resurrect the container. The repo config, images and
+[`deploy.md`](deploy.md) are intact for the redeployment.
 
 ### Why Base and Polygon are off
 
