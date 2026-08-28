@@ -1,6 +1,6 @@
 services:
   tron:
-    image: tronprotocol/java-tron:GreatVoyage-v4.8.1
+    image: tronprotocol/java-tron:GreatVoyage-v4.8.2.1
     container_name: tron-node
     restart: unless-stopped
     volumes:
